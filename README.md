@@ -3,8 +3,9 @@
 A JavaFX Snake game maintained and extended for COMP2042 coursework,
 based on the supplied starter project.
 
-**Status:** Initial maintenance. The build configuration has been
-repaired; gameplay fixes, refactoring and extensions are pending.
+**Status:** Initial maintenance. The Maven Wrapper configuration and
+direction-reversal bug have been fixed. Direction validation has
+20 passing JUnit cases. Further maintenance and extensions are pending.
 
 ## GitHub
 
@@ -79,13 +80,13 @@ are listed below.
 
 No new gameplay extensions have been completed.
 
+- Direction validation prevents direct reversal into the snake's body.
+  Verified with 20 passing JUnit cases and manual gameplay checks.
+
 ## Implemented but Not Working Properly
 
 ### Observed during gameplay
 
-- **Direction reversal:** Up followed quickly by Down can cause an
-  apparent reversal and self-collision. Source inspection identified
-  an incorrect Down-direction check.
 - **Collection audio:** No sound plays when a coin is collected.
 - **Snake rendering:** Body sections occasionally disappear briefly.
   The cause is still under investigation.
@@ -121,17 +122,15 @@ the reasons for omission.
 
 ## New Java Classes
 
-None at this stage.
-
-New entries will include each class's source path, purpose and
-reason for introduction.
+- `src/test/java/com/comp2042/GameControllerTest.java`:
+  Parameterised JUnit tests covering opposite directions, perpendicular
+  turns, repeated directions and non-arrow keys.
 
 ## Modified Java Classes
 
-None at this stage.
-
-Future entries will identify the modified classes, their source
-paths, the changes made and the reasons for those changes.
+- `src/main/java/com/comp2042/GameController.java`:
+  Extracted direction validation into a directly testable method and
+  corrected the DOWN condition to reject movement opposite to UP.
 
 ## Unexpected Problems
 
@@ -176,7 +175,11 @@ Completed checks:
 - JavaFX application launch.
 - Manual checks of the baseline gameplay features.
 
-No JUnit tests have been added yet. Automated regression tests will
-be introduced alongside gameplay fixes and extensions.
+Run automated tests with `.\mvnw.cmd test`.
+
+Direction validation currently has 20 passing parameterised test cases.
+Manual checks also confirmed reversal prevention, pause/resume and reset.
+
+See [test cases and results](Docs/Testing.md) for evidence and limitations.
 
 Compilation success alone does not verify gameplay correctness.
