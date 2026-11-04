@@ -85,7 +85,7 @@ public class GameController {
     public void handle(KeyEvent event) {
         if (event.getCode().isArrowKey()) animation.play();
 
-        if (valKey(event.getCode()) && !keyPressed) {
+        if (isDirectionAllowed(key, event.getCode()) && !keyPressed) {
             lastKey = key;
             key = event.getCode();
             keyPressed = true;
@@ -122,16 +122,30 @@ public class GameController {
         }
     }
 
-    private boolean valKey(KeyCode key) {
-        if (!key.isArrowKey()) return false;
-        else {
-            if (key.equals(KeyCode.LEFT)) if (!this.key.equals(KeyCode.RIGHT)) return true;
-            if (key.equals(KeyCode.RIGHT)) if (!this.key.equals(KeyCode.LEFT)) return true;
-            if (key.equals(KeyCode.DOWN)) if (!this.key.equals(KeyCode.DOWN)) return true;
-            if (key.equals(KeyCode.UP)) return !this.key.equals(KeyCode.DOWN);
-            return false;
+        /**
+         * Checks whether a requested direction is accepted.
+         *
+         * @param currentDirection the current movement direction
+         * @param requestedDirection the requested keyboard direction
+         * @return true if the direction is accepted; otherwise false
+         */
+        static boolean isDirectionAllowed(
+                KeyCode currentDirection,
+                KeyCode requestedDirection) {
+
+            if (!requestedDirection.isArrowKey()) {
+                return false;
+            }
+
+            return switch (requestedDirection) {
+                case LEFT -> currentDirection != KeyCode.RIGHT;
+                case RIGHT -> currentDirection != KeyCode.LEFT;
+                case DOWN -> currentDirection != KeyCode.UP;
+                case UP -> currentDirection != KeyCode.DOWN;
+                default -> false;
+            };
         }
-    }
+
 
     private void reset() {
 
