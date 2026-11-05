@@ -184,3 +184,16 @@ Command: `.\mvnw.cmd clean test`
 - Obstacles can overlap the game-over title.
 
 These visual issues remain outside this collision fix.
+
+## Coin transparency — 5 November 2026
+
+Branch: `fix/coin-transparency`
+
+Updated the blue, gold, rainbow, red and silver coin PNGs to remove
+their opaque backgrounds.
+
+Manual verification:
+- The red coin displays without the pale square during gameplay.
+- Other coin colours remain pending visual verification.
+
+No Java code changed.
