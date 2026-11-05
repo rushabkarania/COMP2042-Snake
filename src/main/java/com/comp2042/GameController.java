@@ -82,6 +82,7 @@ public class GameController {
     }));
 
     public void handle(KeyEvent event) {
+        System.out.println("Key pressed: " + event.getCode());
         if (event.getCode().isArrowKey() && !snek.getDead()) {
             animation.play();
 
@@ -100,14 +101,17 @@ public class GameController {
             gameView.scoreLabel.setText("Score: " + game.getScorePoints());
         }
 
-        if (event.getCode().equals(KeyCode.PLUS)) {
+        if (event.getCode() == KeyCode.PLUS
+                || event.getCode() == KeyCode.ADD
+                || event.getCode() == KeyCode.EQUALS) {
             gameView.scaleToFullscreen(true, stage, obstacle, snek, coin);
             gameView.gameOverLabel.setStyle("-fx-font-size: 50;");
             gameView.gameWonLabel.setStyle("-fx-font-size: 50;");
             gameView.scoreLabel.setStyle("-fx-font-size: 35;");
         }
 
-        if (event.getCode().equals(KeyCode.MINUS)) {
+        if (event.getCode() == KeyCode.MINUS
+                || event.getCode() == KeyCode.SUBTRACT) {
             gameView.scaleToFullscreen(false, stage, obstacle, snek, coin);
             gameView.gameOverLabel.setStyle("-fx-font-size: 15;");
             gameView.gameWonLabel.setStyle("-fx-font-size: 15;");
