@@ -62,3 +62,63 @@ handling during actual gameplay.
 
 
 ![Visible gap at a snake bend](images/snake-body-gap.png)
+
+## Snake rendering — 4 November 2026
+
+Branch: `fix/snake-rendering`
+
+### Changes
+
+- Replaced stored corner history with sprite selection based on
+  neighbouring snake positions.
+- Removed turnArray and turnDir.
+- Made the controller's movement direction instance-specific.
+- Corrected double application of fullscreen scaling.
+- Handled the duplicate head/body position during fatal blocked moves
+  when preparing the drawing positions.
+
+### Automated checks
+
+Before renderer integration, all 42 tests passed:
+20 direction-validation cases and 22 sprite-selection cases.
+
+After renderer integration, `.\mvnw.cmd test` completed successfully:
+42 tests run, 0 failures, 0 errors and 0 skipped.
+
+Manual gameplay testing covered 10 rounds. The previously observed
+snake-body gap did not recur during these runs.
+
+`git diff --check` reported no whitespace errors.
+
+### Manual checks
+
+Played 10 rounds after integration. The previously observed body gaps
+did not recur. A screenshot captures connected segments through
+multiple bends on the game-over screen.
+
+### Remaining verification
+
+Explicit checks of border wrapping, fullscreen scaling, and
+Esc → Start are still to be recorded if not covered during these rounds.
+
+### Additional regression tests — 5 November 2026
+
+Moved tail rotation and preparation of drawing positions into
+SnakeSpriteSelector so these calculations can be tested directly.
+
+Added 15 test cases covering:
+- Tail rotation in all four directions, including wrapped borders.
+- Rejection of invalid tail neighbours.
+- Removal of the duplicate final head position after a blocked fatal move.
+- Preservation of the original body list and interior self-collision positions.
+- Living snakes and empty drawing lists.
+
+Command: `.\mvnw.cmd clean test`
+
+Result: BUILD SUCCESS.
+57 tests run, 0 failures, 0 errors and 0 skipped:
+20 direction-validation cases and 37 rendering-helper cases.
+
+These tests check rendering calculations, not JavaFX visual output.
+The earlier 10-round manual gameplay check found no recurrence
+of the snake-body gap.

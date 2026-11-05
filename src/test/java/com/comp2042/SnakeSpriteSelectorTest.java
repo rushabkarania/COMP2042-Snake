@@ -1,6 +1,7 @@
 package com.comp2042;
 
 import java.awt.Point;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -122,5 +123,68 @@ class SnakeSpriteSelectorTest {
                         new Point(5, 5),
                         new Point(6, 5),
                         width, height));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "5, 5, 5, 4, 0",
+            "5, 5, 6, 5, 90",
+            "5, 5, 5, 6, 180",
+            "5, 5, 4, 5, 270",
+            "5, 0, 5, 7, 0",
+            "11, 5, 0, 5, 90",
+            "5, 7, 5, 0, 180",
+            "0, 5, 11, 5, 270"
+    })
+    void selectsTailRotationIncludingRectangularBoardWrapping(
+            int tailX, int tailY, int nextX, int nextY, int expected) {
+        assertEquals(expected, SnakeSpriteSelector.tailRotation(
+                new Point(tailX, tailY), new Point(nextX, nextY), 12, 8));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"5, 5", "6, 6", "7, 5"})
+    void rejectsNonAdjacentTailNeighbour(int nextX, int nextY) {
+        assertThrows(IllegalArgumentException.class,
+                () -> SnakeSpriteSelector.tailRotation(
+                        new Point(5, 5), new Point(nextX, nextY), 12, 8));
+    }
+
+    @Test
+    void removesBlockedMoveDuplicateWithoutChangingInput() {
+        Point head = new Point(0, 5);
+        List<Point> body = List.of(
+                new Point(2, 5), new Point(1, 5), new Point(head));
+        List<Point> drawing = SnakeSpriteSelector.drawingBody(body, head, true);
+
+        assertEquals(List.of(new Point(2, 5), new Point(1, 5)), drawing);
+        assertEquals(3, body.size());
+        assertEquals(head, body.get(2));
+        // The remaining neck now has two distinct neighbours.
+        assertEquals(new SnakeSpriteSelector.Sprite(false, 90),
+                SnakeSpriteSelector.select(
+                        drawing.get(0), drawing.get(1), head, 20, 20));
+    }
+
+    @Test
+    void preservesBodyWhenHeadOverlapsInteriorAfterSelfCollision() {
+        Point head = new Point(2, 2);
+        List<Point> body = List.of(
+                new Point(2, 3), new Point(2, 2), new Point(3, 2),
+                new Point(3, 1), new Point(2, 1));
+        assertEquals(body, SnakeSpriteSelector.drawingBody(body, head, true));
+    }
+
+    @Test
+    void doesNotTrimLivingSnakeBody() {
+        Point head = new Point(0, 5);
+        List<Point> body = List.of(new Point(1, 5), new Point(head));
+        assertEquals(body, SnakeSpriteSelector.drawingBody(body, head, false));
+    }
+
+    @Test
+    void acceptsEmptyBodyForDrawing() {
+        assertEquals(List.of(), SnakeSpriteSelector.drawingBody(
+                List.of(), new Point(5, 5), true));
     }
 }

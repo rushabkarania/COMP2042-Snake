@@ -1,6 +1,8 @@
 package com.comp2042;
 
 import java.awt.Point;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Determines body-sprite rotation from neighbouring snake positions.
@@ -46,6 +48,46 @@ final class SnakeSpriteSelector {
             default -> throw new IllegalArgumentException(
                     "Invalid body connections");
         };
+    }
+
+    /**
+     * Selects the tail rotation towards its neighbour, including wrapping.
+     *
+     * @param tail the tail position
+     * @param next the neighbour towards the head
+     * @param width the board width in cells
+     * @param height the board height in cells
+     * @return clockwise rotation in degrees
+     * @throws IllegalArgumentException if the cells are not adjacent or
+     *         either board dimension is smaller than three
+     */
+    static int tailRotation(Point tail, Point next, int width, int height) {
+        return switch (direction(tail, next, width, height)) {
+            case 1 -> 0;
+            case 2 -> 90;
+            case 4 -> 180;
+            case 8 -> 270;
+            default -> throw new IllegalArgumentException("Invalid tail direction");
+        };
+    }
+
+    /**
+     * Copies body positions for rendering, excluding a duplicate final head
+     * position left by a blocked fatal move. The input list is not modified.
+     * Point objects are shared and must not be modified by the renderer.
+     *
+     * @param body body positions ordered from tail towards head
+     * @param head the current head position
+     * @param dead whether the snake has died
+     * @return a separate list of body positions to draw
+     */
+    static List<Point> drawingBody(List<Point> body, Point head, boolean dead) {
+        List<Point> result = new ArrayList<>(body);
+        if (dead && !result.isEmpty()
+                && result.get(result.size() - 1).equals(head)) {
+            result.remove(result.size() - 1);
+        }
+        return result;
     }
 
     private static int direction(
