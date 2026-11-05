@@ -163,6 +163,8 @@ Compatibility cleanup remains pending.
 | Arrow key while paused | Resume |
 | Tab | Reset the game |
 | Escape | Return to the main menu |
+| = / + / number-pad + | Enter fullscreen |
+| - / number-pad - | Return to windowed mode |
 
 Known limitations affecting these controls are listed above.
 
