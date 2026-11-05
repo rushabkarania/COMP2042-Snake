@@ -5,12 +5,9 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-import java.io.File;
 import java.util.Random;
 
 public class GameController {
@@ -19,7 +16,7 @@ public class GameController {
     private GameView gameView;
     private Game game;
     private Stage stage;
-    private String coinSoundPath = "resources/views/res/coinSound.wav";
+    private final CoinSound coinSound = new CoinSound();
     private Obstacle obstacle;
 
     private KeyCode key = KeyCode.LEFT;
@@ -59,6 +56,7 @@ public class GameController {
             boolean collectedCoin = snek.move(direction, coin.getPos());
 
             if (collectedCoin) {
+                coinSound.play();
                 powerCoin();
                 game.incScore();
                 if (game.gameWon()) {
