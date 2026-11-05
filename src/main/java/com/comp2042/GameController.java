@@ -82,7 +82,7 @@ public class GameController {
     }));
 
     public void handle(KeyEvent event) {
-        System.out.println("Key pressed: " + event.getCode());
+
         if (event.getCode().isArrowKey() && !snek.getDead()) {
             animation.play();
 
