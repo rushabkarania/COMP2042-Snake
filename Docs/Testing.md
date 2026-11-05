@@ -197,3 +197,44 @@ Manual verification:
 - Other coin colours remain pending visual verification.
 
 No Java code changed.
+
+## Coin collection audio — 5 November 2026
+
+Branch: `fix/coin-audio`
+
+### Cause and change
+
+The bundled `coinSound.wav` existed, but GameController did not load or
+play it. Unused Media/MediaPlayer imports and a sound path remained.
+
+CoinSound now loads the resource through a classpath URL and reuses one
+AudioClip per controller. Successful collection triggers playback before
+the win check. Tab reset retains this sound object. Missing resources and
+synchronous loading/playback failures disable audio with a diagnostic
+instead of interrupting gameplay. Asynchronous device failures may still
+be reported by the JavaFX media system.
+
+### Automated verification
+
+Five new CoinSoundTest cases cover:
+- A readable, non-empty bundled WAV resource.
+- One load and one playback request per call, including repeated calls.
+- Missing resource handling.
+- Loading failure handling.
+- Playback failure handling without repeated attempts or diagnostics.
+
+Assistant verification: all 101 tests passed using an ECJ compiler with
+Java 17 and JavaFX 17. This was not the project's configured Maven stack.
+The tests use replacement playback callbacks; they do not establish
+that sound is audible or that controller events fire correctly in-game.
+
+Windows Maven verification: pending `./mvnw.cmd clean test`.
+
+### Pending manual checks
+
+- Collect several coins: one audible sound for each successful collection.
+- Collect available power-up coins: the same collection sound plays.
+- Ordinary movement and collisions do not trigger collection audio.
+- Tab reset, then collect again: audio still works.
+- Escape to the menu, start again and collect: audio still works.
+- Check the console for audio errors and confirm gameplay remains responsive.

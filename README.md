@@ -87,7 +87,8 @@ No new gameplay extensions have been completed.
 
 ### Observed during gameplay
 
-- **Collection audio:** No sound plays when a coin is collected.
+- **Collection audio:** The bundled sound plays when a coin is collected,
+    including after reset and returning from the menu.
 - **Snake rendering:** Body sections occasionally disappear briefly.
   The cause is still under investigation.
 - **Obstacle density:** Obstacle spawning can feel excessive.
@@ -121,6 +122,9 @@ Any features omitted from the final version will be listed with
 the reasons for omission.
 
 ## New Java Classes
+
+- `src/main/java/com/comp2042/CoinSound.java`: Loads and reuses the collection sound; handles missing resources and synchronous audio failures.
+- `src/test/java/com/comp2042/CoinSoundTest.java`: Checks the WAV resource, repeat playback requests and failure handling without audio hardware.
 
 - `src/test/java/com/comp2042/GameControllerTest.java`:
   Parameterised JUnit tests covering opposite directions, perpendicular
