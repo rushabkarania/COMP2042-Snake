@@ -7,6 +7,10 @@ import javafx.scene.paint.Color;
 import java.awt.*;
 import java.util.ArrayList;
 
+/**
+ * Stores snake positions and applies movement, growth and collision rules.
+ * Sprite views are loaded lazily when requested by the renderer.
+ */
 public class Snake {
     private Color headColor = Color.web("2eb872");
     private Color bodyColor = Color.web("a3de83");
@@ -18,14 +22,10 @@ public class Snake {
     private boolean ignoreBorders = false;
     private boolean noBorder;
     private Obstacle obstacle;
-    private Image imgInputHead = new Image("resources/views/res/snakehead.png");
-    private ImageView imageHead = new ImageView(imgInputHead);
-    private Image imgInputBody = new Image("resources/views/res/snakebody.png");
-    private ImageView imageBody = new ImageView(imgInputBody);
-    private Image imgInputTurn = new Image("resources/views/res/snaketurnleft.png");
-    private ImageView imageTurn = new ImageView(imgInputTurn);
-    private Image imgInputTail = new Image("resources/views/res/snaketail.png");
-    private ImageView imageTail = new ImageView(imgInputTail);
+    private ImageView imageHead;
+    private ImageView imageBody;
+    private ImageView imageTurn;
+    private ImageView imageTail;
     private int snakeDir = 270;
 
     public Snake(int x, int y, boolean noBorder, Obstacle obstacle) {
@@ -37,57 +37,62 @@ public class Snake {
         this.gy = y;
     }
 
-    public void move(char dir) {
-        body.add(new Point(head));
+    /**
+     * Attempts one complete movement step, including growth and collision checks.
+     * A fatal step marks the snake dead but preserves its last valid positions
+     * and sprite direction. Calls after death leave all state unchanged.
+     *
+     * @param dir U, D, L or R
+     * @param coinPosition the coin cell, or null when no coin is present
+     * @return true only when a successful move collects the coin
+     * @throws IllegalArgumentException if a living snake receives an invalid direction
+     */
+    public boolean move(char dir, Point coinPosition) {
+        if (dead) {
+            return false;
+        }
+
+        Point next = new Point(head);
+        int nextDirection;
         switch (dir) {
-            case 'U':
-                snakeDir = 0;
-                head.translate(0, -1);
-                if (borderControl() && (!ignoreBorders && !noBorder) || obstacle.getObstacles().contains(head)) {
-                    head.translate(0, 1);
-                    dead = true;
-                } else if (borderControl() && (ignoreBorders || noBorder)) {
-                    head.setLocation(head.getX(), gy - 1);
-                }
-                break;
-
-            case 'D':
-                snakeDir = 180;
-                head.translate(0, 1);
-                if (borderControl() && (!ignoreBorders && !noBorder) || obstacle.getObstacles().contains(head)) {
-                    head.translate(0, -1);
-                    dead = true;
-                } else if (borderControl() && (ignoreBorders || noBorder)) {
-                    head.setLocation(head.getX(), 0);
-                }
-                break;
-
-            case 'L':
-                snakeDir = 270;
-                head.translate(-1, 0);
-                if (borderControl() && (!ignoreBorders && !noBorder) || obstacle.getObstacles().contains(head)) {
-                    head.translate(1, 0);
-                    dead = true;
-                } else if (borderControl() && (ignoreBorders || noBorder)) {
-                    head.setLocation(gx - 1, head.getY());
-                }
-                break;
-
-            case 'R':
-                snakeDir = 90;
-                head.translate(1, 0);
-                if (borderControl() && (!ignoreBorders && !noBorder) || obstacle.getObstacles().contains(head)) {
-                    head.translate(-1, 0);
-                    dead = true;
-                } else if (borderControl() && (ignoreBorders || noBorder)) {
-                    head.setLocation(0, head.getY());
-                }
-                break;
+            case 'U' -> { next.translate(0, -1); nextDirection = 0; }
+            case 'R' -> { next.translate(1, 0); nextDirection = 90; }
+            case 'D' -> { next.translate(0, 1); nextDirection = 180; }
+            case 'L' -> { next.translate(-1, 0); nextDirection = 270; }
+            default -> throw new IllegalArgumentException("Unknown direction: " + dir);
         }
 
-        if (body.size() > 4 && hitSelf() && !body.get(0).equals(head)) {
+        boolean outside = next.x < 0 || next.y < 0 || next.x >= gx || next.y >= gy;
+        if (outside && !(ignoreBorders || noBorder)) {
             dead = true;
+            return false;
         }
+        if (outside) {
+            next.setLocation(Math.floorMod(next.x, gx), Math.floorMod(next.y, gy));
+        }
+
+        boolean grows = next.equals(coinPosition);
+        // The tail cell is available only if this move will remove the tail.
+        int firstOccupied = grows ? 0 : 1;
+        boolean hitsBody = false;
+        for (int i = firstOccupied; i < body.size(); i++) {
+            if (next.equals(body.get(i))) {
+                hitsBody = true;
+                break;
+            }
+        }
+        if (obstacle.getObstacles().contains(next) || hitsBody) {
+            dead = true;
+            return false;
+        }
+
+        body.add(new Point(head));
+        if (!grows) {
+            body.remove(0);
+        }
+        head.setLocation(next);
+        snakeDir = nextDirection;
+        return grows;
     }
 
     public int getBodyDir(int bodyCount) {
@@ -98,21 +103,6 @@ public class Snake {
         } else {
             return 0;
         }
-    }
-
-    public boolean ateCoin(Coin coin) {
-        if (!head.equals(coin.getPos())) {
-            body.remove(0);
-        }
-        return head.equals(coin.getPos());
-    }
-
-    private boolean borderControl() {
-        return head.getX() < 0 || head.getY() < 0 || head.getX() >= gx || head.getY() >= gy;
-    }
-
-    public boolean hitSelf() {
-        return body.contains(head);
     }
 
     public ArrayList<Point> getBody() {
@@ -140,14 +130,23 @@ public class Snake {
     }
 
     public ImageView getImageViewHead() {
+        if (imageHead == null) {
+            imageHead = new ImageView(new Image("resources/views/res/snakehead.png"));
+        }
         return imageHead;
     }
 
     public ImageView getImageViewBody() {
+        if (imageBody == null) {
+            imageBody = new ImageView(new Image("resources/views/res/snakebody.png"));
+        }
         return imageBody;
     }
 
     public ImageView getImageViewTurn() {
+        if (imageTurn == null) {
+            imageTurn = new ImageView(new Image("resources/views/res/snaketurnleft.png"));
+        }
         return imageTurn;
     }
 
@@ -156,6 +155,9 @@ public class Snake {
     }
 
     public ImageView getImageViewTail() {
+        if (imageTail == null) {
+            imageTail = new ImageView(new Image("resources/views/res/snaketail.png"));
+        }
         return imageTail;
     }
 }
