@@ -122,3 +122,29 @@ Result: BUILD SUCCESS.
 These tests check rendering calculations, not JavaFX visual output.
 The earlier 10-round manual gameplay check found no recurrence
 of the snake-body gap.
+
+## Fullscreen controls — 5 November 2026
+
+### Problem
+
+The keyboard reported EQUALS when the fullscreen shortcut was pressed,
+but the controller only accepted PLUS.
+
+### Change
+
+Fullscreen entry now accepts EQUALS, PLUS and ADD.
+Returning to windowed mode accepts MINUS and SUBTRACT.
+
+### Manual verification
+
+- Passed: = enters fullscreen without requiring Shift.
+- Passed: - returns to windowed mode.
+- Passed: repeated switching between the two modes.
+- Snake segments appeared connected in both modes.
+
+Number-pad shortcuts have not been explicitly verified.
+Dedicated automated key-mapping tests remain pending.
+
+### Follow-up
+
+Removed the temporary key-event diagnostic output left in PR #5.
