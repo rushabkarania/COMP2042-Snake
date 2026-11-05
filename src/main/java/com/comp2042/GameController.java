@@ -49,17 +49,16 @@ public class GameController {
             return;
         } else {
 
-            if (key.equals(KeyCode.LEFT)) {
-                snek.move('L');
-            } else if (key.equals(KeyCode.RIGHT)) {
-                snek.move('R');
-            } else if (key.equals(KeyCode.UP)) {
-                snek.move('U');
-            } else if (key.equals(KeyCode.DOWN)) {
-                snek.move('D');
-            }
+            char direction = switch (key) {
+                case LEFT -> 'L';
+                case RIGHT -> 'R';
+                case UP -> 'U';
+                case DOWN -> 'D';
+                default -> throw new IllegalStateException("Invalid movement key: " + key);
+            };
+            boolean collectedCoin = snek.move(direction, coin.getPos());
 
-            if (!snek.getDead() && snek.ateCoin(coin)) {
+            if (collectedCoin) {
                 powerCoin();
                 game.incScore();
                 if (game.gameWon()) {
@@ -71,9 +70,7 @@ public class GameController {
 
             keyPressed = false;
 
-            if (!snek.getDead() || snek.hitSelf()) {
-                gameView.drawGrid(coin, snek, obstacle, gameView.gc, false, 0);
-            }
+            gameView.drawGrid(coin, snek, obstacle, gameView.gc, false, 0);
 
             gameView.gameWon();
             gameView.gameOver(snek);

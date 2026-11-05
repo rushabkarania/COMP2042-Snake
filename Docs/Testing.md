@@ -148,3 +148,39 @@ Dedicated automated key-mapping tests remain pending.
 ### Follow-up
 
 Removed the temporary key-event diagnostic output left in PR #5.
+
+
+## Snake collision state — 5 November 2026
+
+Branch: `fix/snake-collision-state`
+
+### Changes
+
+Movement now checks the destination before changing the snake's
+positions. Fatal moves preserve the last valid head, body and direction.
+Movement requests after death leave the snake unchanged.
+
+### Automated checks
+
+Command: `.\mvnw.cmd clean test`
+
+96 tests passed, with zero failures, errors or skipped tests:
+- 20 direction-validation cases.
+- 39 movement and collision cases.
+- 37 sprite-selection cases.
+
+### Manual checks
+
+- Self-collision: game over triggered.
+- Wall collision: game over triggered.
+- Obstacle collision: game over triggered.
+- Arrow keys after death: no movement or growth.
+- Tab reset: a new round starts successfully.
+- Snake remained visually connected in the captured collision cases.
+
+### Remaining issues
+
+- A pale square background is visible around the red coin.
+- Obstacles can overlap the game-over title.
+
+These visual issues remain outside this collision fix.
