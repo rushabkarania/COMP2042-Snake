@@ -8,7 +8,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-import java.util.Random;
+
 
 public class GameController {
     private Snake snek;
@@ -16,6 +16,7 @@ public class GameController {
     private GameView gameView;
     private Game game;
     private Stage stage;
+    private final CoinSequence coinSequence = new CoinSequence();
     private final CoinSound coinSound = new CoinSound();
     private Obstacle obstacle;
 
@@ -37,48 +38,51 @@ public class GameController {
         this.stage = stage;
 
         this.obstacle = obstacle;
+        stage.setOnHidden(event -> animation.stop());
         animation.setCycleCount(Animation.INDEFINITE);
         animation.setRate(game.getSpeed());
     }
 
-    private final Timeline animation = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
-        if (snek.getDead()) {
-            return;
-        } else {
+    private final Timeline animation = new Timeline(new KeyFrame(Duration.seconds(1), event -> advanceRound()));
 
-            char direction = switch (key) {
-                case LEFT -> 'L';
-                case RIGHT -> 'R';
-                case UP -> 'U';
-                case DOWN -> 'D';
-                default -> throw new IllegalStateException("Invalid movement key: " + key);
-            };
-            boolean collectedCoin = snek.move(direction, coin.getPos());
+    private boolean roundFinished() {
+        return snek.getDead() || game.gameWon();
+    }
 
-            if (collectedCoin) {
-                coinSound.play();
-                powerCoin();
-                game.incScore();
-                if (game.gameWon()) {
-                    gameView.drawGrid(coin, snek, obstacle, gameView.gc, false, 0);
-                    return;
-                }
+    private void advanceRound() {
+        char direction = switch (key) {
+            case LEFT -> 'L';
+            case RIGHT -> 'R';
+            case UP -> 'U';
+            case DOWN -> 'D';
+            default -> throw new IllegalStateException("Invalid movement key: " + key);
+        };
+        boolean collectedCoin = snek.move(direction, coin.getPos());
+
+        if (collectedCoin) {
+            coinSound.play();
+            powerCoin();
+            game.incScore();
+            if (!game.gameWon()) {
                 newCoin();
             }
-
-            keyPressed = false;
-
-            gameView.drawGrid(coin, snek, obstacle, gameView.gc, false, 0);
-
-            gameView.gameWon();
-            gameView.gameOver(snek);
-            gameView.updateScoreLabel();
         }
-    }));
+
+        keyPressed = false;
+
+        gameView.drawGrid(coin, snek, obstacle, gameView.gc, false, 0);
+
+        gameView.gameWon();
+        gameView.gameOver(snek);
+        gameView.updateScoreLabel();
+        if (roundFinished()) {
+            animation.stop();
+        }
+    }
 
     public void handle(KeyEvent event) {
 
-        if (event.getCode().isArrowKey() && !snek.getDead()) {
+        if (event.getCode().isArrowKey() && !roundFinished()) {
             animation.play();
 
             if (isDirectionAllowed(key, event.getCode()) && !keyPressed) {
@@ -93,7 +97,6 @@ public class GameController {
 
         if (event.getCode().equals(KeyCode.TAB)) {
             reset();
-            gameView.scoreLabel.setText("Score: " + game.getScorePoints());
         }
 
         if (event.getCode() == KeyCode.PLUS
@@ -147,19 +150,17 @@ public class GameController {
 
     private void reset() {
 
-        animation.jumpTo(Duration.ZERO);
         animation.stop();
 
+        obstacle.reset();
+        coinSequence.reset();
+        game.resetScore();
         snek = new Snake(game.getWidth(), game.getHeight(), game.isNoBorder(), obstacle);
         coin = new Coin(game.getWidth(), game.getHeight(), snek, obstacle);
-
-        int unusedObstacleCount = new Random().nextInt(game.getWidth() * game.getHeight() / 20) + 3;
 
         animation.setRate(game.getSpeed());
         key = KeyCode.LEFT;
         keyPressed = false;
-        game.resetScore();
-        obstacle.reset();
 
         gameView.gameWon();
         gameView.gameOver(snek);
@@ -175,9 +176,8 @@ public class GameController {
             RainbowCoin tempCoin = (RainbowCoin) coin;
             animation.setRate(game.getSpeed() + tempCoin.getSpeedBonus());
         } else if (coin.getClass().equals(SilverCoin.class)){
-            Random rnd = new Random();
-            obstacle.newObstacles(snek, coin, rnd.nextInt(game.getWidth() * game.getHeight()/ 20) +3);
-            game.decMaxScore(obstacle.getObstacles().size());
+            int added = obstacle.newObstacles(snek, coin, 4);
+            game.decMaxScore(added);
         } else if (coin.getClass().equals(BlueCoin.class)) {
             snek.ignoreBorders(true);
         }
@@ -185,22 +185,15 @@ public class GameController {
     }
 
     private void newCoin() {
-        if (game.isPowerUp()) {
-            Random rnd = new Random();
-            int ran = rnd.nextInt(12);
-            if (ran == 1) {
-                coin = new GoldCoin(game.getWidth(), game.getHeight(), snek, obstacle);
-            } else if (ran == 1) {
-                coin = new RainbowCoin(game.getWidth(), game.getHeight(), snek, obstacle);
-            } else if (ran == 3) {
-                coin = new BlueCoin(game.getWidth(), game.getHeight(), snek, obstacle);
-            } else if (ran == 4 && obstacle.getObstacles().size() == 0) {
-                coin = new SilverCoin(game.getWidth(), game.getHeight(), snek, obstacle);
-            } else {
-                coin = new Coin(game.getWidth(), game.getHeight(), snek, obstacle);
-            }
-        } else {
-            coin = new Coin(game.getWidth(), game.getHeight(), snek, obstacle);
-        }
+        int width = game.getWidth();
+        int height = game.getHeight();
+        CoinSequence.Type type = game.isPowerUp() ? coinSequence.next() : CoinSequence.Type.RED;
+        coin = switch (type) {
+            case RED -> new Coin(width, height, snek, obstacle);
+            case GOLD -> new GoldCoin(width, height, snek, obstacle);
+            case BLUE -> new BlueCoin(width, height, snek, obstacle);
+            case RAINBOW -> new RainbowCoin(width, height, snek, obstacle);
+            case SILVER -> new SilverCoin(width, height, snek, obstacle);
+        };
     }
 }

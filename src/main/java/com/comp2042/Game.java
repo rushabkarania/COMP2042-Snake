@@ -28,7 +28,7 @@ public class Game {
         this.powerUp = powerUp;
         width = x;
         height = y;
-        maxScore = x * y - 2;
+        resetScore();
         this.powerUp = powerUp;
         if (height > 50) {
             multiplier = 10;
@@ -46,7 +46,7 @@ public class Game {
     }
 
     public void decMaxScore(int num) {
-        this.maxScore -= (num - 1);
+        this.maxScore -= num;
     }
 
     public int getWidth() {
@@ -58,6 +58,7 @@ public class Game {
     }
 
     public void resetScore() {
+        maxScore = width * height - 2;
         score = 0;
         scorePoints = 0;
     }
