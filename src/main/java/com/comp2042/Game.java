@@ -46,7 +46,7 @@ public class Game {
     }
 
     public void decMaxScore(int num) {
-        this.maxScore -= (num - 1);
+        this.maxScore -= num;
     }
 
     public int getWidth() {

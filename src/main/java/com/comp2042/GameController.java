@@ -8,7 +8,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-import java.util.Random;
+
 
 public class GameController {
     private Snake snek;
@@ -16,6 +16,7 @@ public class GameController {
     private GameView gameView;
     private Game game;
     private Stage stage;
+    private final CoinSequence coinSequence = new CoinSequence();
     private final CoinSound coinSound = new CoinSound();
     private Obstacle obstacle;
 
@@ -152,6 +153,7 @@ public class GameController {
         animation.stop();
 
         obstacle.reset();
+        coinSequence.reset();
         game.resetScore();
         snek = new Snake(game.getWidth(), game.getHeight(), game.isNoBorder(), obstacle);
         coin = new Coin(game.getWidth(), game.getHeight(), snek, obstacle);
@@ -174,9 +176,8 @@ public class GameController {
             RainbowCoin tempCoin = (RainbowCoin) coin;
             animation.setRate(game.getSpeed() + tempCoin.getSpeedBonus());
         } else if (coin.getClass().equals(SilverCoin.class)){
-            Random rnd = new Random();
-            obstacle.newObstacles(snek, coin, rnd.nextInt(game.getWidth() * game.getHeight()/ 20) +3);
-            game.decMaxScore(obstacle.getObstacles().size());
+            int added = obstacle.newObstacles(snek, coin, 4);
+            game.decMaxScore(added);
         } else if (coin.getClass().equals(BlueCoin.class)) {
             snek.ignoreBorders(true);
         }
@@ -184,22 +185,15 @@ public class GameController {
     }
 
     private void newCoin() {
-        if (game.isPowerUp()) {
-            Random rnd = new Random();
-            int ran = rnd.nextInt(12);
-            if (ran == 1) {
-                coin = new GoldCoin(game.getWidth(), game.getHeight(), snek, obstacle);
-            } else if (ran == 1) {
-                coin = new RainbowCoin(game.getWidth(), game.getHeight(), snek, obstacle);
-            } else if (ran == 3) {
-                coin = new BlueCoin(game.getWidth(), game.getHeight(), snek, obstacle);
-            } else if (ran == 4 && obstacle.getObstacles().size() == 0) {
-                coin = new SilverCoin(game.getWidth(), game.getHeight(), snek, obstacle);
-            } else {
-                coin = new Coin(game.getWidth(), game.getHeight(), snek, obstacle);
-            }
-        } else {
-            coin = new Coin(game.getWidth(), game.getHeight(), snek, obstacle);
-        }
+        int width = game.getWidth();
+        int height = game.getHeight();
+        CoinSequence.Type type = game.isPowerUp() ? coinSequence.next() : CoinSequence.Type.RED;
+        coin = switch (type) {
+            case RED -> new Coin(width, height, snek, obstacle);
+            case GOLD -> new GoldCoin(width, height, snek, obstacle);
+            case BLUE -> new BlueCoin(width, height, snek, obstacle);
+            case RAINBOW -> new RainbowCoin(width, height, snek, obstacle);
+            case SILVER -> new SilverCoin(width, height, snek, obstacle);
+        };
     }
 }

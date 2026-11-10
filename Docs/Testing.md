@@ -228,7 +228,7 @@ Java 17 and JavaFX 17. This was not the project's configured Maven stack.
 The tests use replacement playback callbacks; they do not establish
 that sound is audible or that controller events fire correctly in-game.
 
-Windows Maven verification: pending `./mvnw.cmd clean test`.
+Windows Maven verification: 101 tests passed with zero failures, errors or skips during the coin audio fix.
 
 ### Pending manual checks
 
@@ -238,3 +238,26 @@ Windows Maven verification: pending `./mvnw.cmd clean test`.
 - Tab reset, then collect again: audio still works.
 - Escape to the menu, start again and collect: audio still works.
 - Check the console for audio errors and confirm gameplay remains responsive.
+
+## Obstacle spawning — 10 November 2026
+
+The first placement fix passed all 106 tests on Windows. In gameplay the silver coin still produced a crowded wave, and obstacles overlapped the game-over label.
+
+The revised generator shuffles available cells and places at most one block in each board quarter, up to four total. It keeps the outer columns, top three rows and bottom two rows clear. The minimum straight-line distance from the head and between blocks is four grid cells. A crowded board can receive fewer blocks. The win target uses the actual count added.
+
+Revised suite: 106 tests passed with Java 17 and JavaFX 17. The revised placement cases cover 100 standard layouts, a rectangular board with an existing block, and a board with no suitable cells. Windows Maven and visual verification of this revision are pending.
+
+Manual check: collect a silver coin, inspect spacing and label clearance in windowed and fullscreen modes, then press Tab and verify the obstacles clear.
+
+
+## Coin selection — 10 November 2026
+
+Playtesting confirmed the revised obstacle spacing felt right. A separate round reached 130 points without a reported silver coin. Previously silver depended on a random draw and became ineligible while obstacles existed. Rainbow shared the same draw as gold and was unreachable.
+
+CoinSequenceTest checks the contents of 20 consecutive groups and verifies that resetting during a group restarts the silver countdown. The original red coin is placed before the sequence begins. Windows verification of repeat silver and rainbow pickups is pending.
+
+## Repeat silver pickups — 10 November 2026
+
+Playtesting found that a second silver pickup gave points but left the four blocks in the same positions. Later pickups now relocate one block when a safe cell is available. The other three stay in place on a full wave. If relocation is impossible, the existing layout is preserved. The win target changes only for additional blocks.
+
+Two regression cases check repeated relocation and the no-space fallback. Windows gameplay check pending: compare layouts before and after collecting a second silver, then reset with Tab.

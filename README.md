@@ -71,7 +71,7 @@ have been checked manually during ordinary gameplay:
 | Main menu | The menu appears and Start launches the game. |
 | Basic movement | Arrow keys control the snake. |
 | Coin collection | Collecting coins increases the score and snake length. |
-| Obstacles | Collecting a silver coin introduces obstacles. |
+| Obstacles | A silver coin places up to four obstacles, one per board quarter. Positions vary each round. |
 | Game over | A game-over message and score are displayed. |
 | Visible reset | Reset restores the displayed score and snake and clears obstacles. |
 
@@ -83,6 +83,10 @@ No new gameplay extensions have been completed.
 - Direction validation prevents direct reversal into the snake's body.
   Verified with 20 passing JUnit cases and manual gameplay checks.
 
+### Coin spawning
+
+Each round starts with a red coin. With power-ups enabled, the next seven spawns contain four red coins and one each of gold, blue and rainbow in shuffled order. The eighth spawn is silver. This sequence repeats and restarts on Tab. Silver awards five points. Later pickups move one existing block within its quarter when a safe replacement cell is available, then fill eligible empty quarters up to four blocks. With power-ups disabled, all coins are red.
+
 ## Implemented but Not Working Properly
 
 ### Observed during gameplay
@@ -91,13 +95,10 @@ No new gameplay extensions have been completed.
     including after reset and returning from the menu.
 - **Snake rendering:** Body sections occasionally disappear briefly.
   The cause is still under investigation.
-- **Obstacle density:** Obstacle spawning can feel excessive.
-  The number and arrangement require gameplay-balancing review.
+
 
 ### Additional source-review findings
 
-- Rainbow coin selection contains an unreachable branch.
-- Obstacle generation can produce duplicate or out-of-bounds positions.
 - Reset does not consistently restore all internal game state.
 - Returning to the menu does not explicitly stop the previous timeline.
 - A rendering calculation applies the scale twice.
@@ -180,6 +181,8 @@ Completed checks:
 - Successful clean compilation.
 - JavaFX application launch.
 - Manual checks of the baseline gameplay features.
+
+Obstacle placement leaves the top three and bottom two rows clear for labels. Each block starts at least four grid cells from the head and other blocks.
 
 Run automated tests with `.\mvnw.cmd test`.
 
