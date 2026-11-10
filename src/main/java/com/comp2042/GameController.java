@@ -37,48 +37,51 @@ public class GameController {
         this.stage = stage;
 
         this.obstacle = obstacle;
+        stage.setOnHidden(event -> animation.stop());
         animation.setCycleCount(Animation.INDEFINITE);
         animation.setRate(game.getSpeed());
     }
 
-    private final Timeline animation = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
-        if (snek.getDead()) {
-            return;
-        } else {
+    private final Timeline animation = new Timeline(new KeyFrame(Duration.seconds(1), event -> advanceRound()));
 
-            char direction = switch (key) {
-                case LEFT -> 'L';
-                case RIGHT -> 'R';
-                case UP -> 'U';
-                case DOWN -> 'D';
-                default -> throw new IllegalStateException("Invalid movement key: " + key);
-            };
-            boolean collectedCoin = snek.move(direction, coin.getPos());
+    private boolean roundFinished() {
+        return snek.getDead() || game.gameWon();
+    }
 
-            if (collectedCoin) {
-                coinSound.play();
-                powerCoin();
-                game.incScore();
-                if (game.gameWon()) {
-                    gameView.drawGrid(coin, snek, obstacle, gameView.gc, false, 0);
-                    return;
-                }
+    private void advanceRound() {
+        char direction = switch (key) {
+            case LEFT -> 'L';
+            case RIGHT -> 'R';
+            case UP -> 'U';
+            case DOWN -> 'D';
+            default -> throw new IllegalStateException("Invalid movement key: " + key);
+        };
+        boolean collectedCoin = snek.move(direction, coin.getPos());
+
+        if (collectedCoin) {
+            coinSound.play();
+            powerCoin();
+            game.incScore();
+            if (!game.gameWon()) {
                 newCoin();
             }
-
-            keyPressed = false;
-
-            gameView.drawGrid(coin, snek, obstacle, gameView.gc, false, 0);
-
-            gameView.gameWon();
-            gameView.gameOver(snek);
-            gameView.updateScoreLabel();
         }
-    }));
+
+        keyPressed = false;
+
+        gameView.drawGrid(coin, snek, obstacle, gameView.gc, false, 0);
+
+        gameView.gameWon();
+        gameView.gameOver(snek);
+        gameView.updateScoreLabel();
+        if (roundFinished()) {
+            animation.stop();
+        }
+    }
 
     public void handle(KeyEvent event) {
 
-        if (event.getCode().isArrowKey() && !snek.getDead()) {
+        if (event.getCode().isArrowKey() && !roundFinished()) {
             animation.play();
 
             if (isDirectionAllowed(key, event.getCode()) && !keyPressed) {
@@ -93,7 +96,6 @@ public class GameController {
 
         if (event.getCode().equals(KeyCode.TAB)) {
             reset();
-            gameView.scoreLabel.setText("Score: " + game.getScorePoints());
         }
 
         if (event.getCode() == KeyCode.PLUS
@@ -147,19 +149,16 @@ public class GameController {
 
     private void reset() {
 
-        animation.jumpTo(Duration.ZERO);
         animation.stop();
 
+        obstacle.reset();
+        game.resetScore();
         snek = new Snake(game.getWidth(), game.getHeight(), game.isNoBorder(), obstacle);
         coin = new Coin(game.getWidth(), game.getHeight(), snek, obstacle);
-
-        int unusedObstacleCount = new Random().nextInt(game.getWidth() * game.getHeight() / 20) + 3;
 
         animation.setRate(game.getSpeed());
         key = KeyCode.LEFT;
         keyPressed = false;
-        game.resetScore();
-        obstacle.reset();
 
         gameView.gameWon();
         gameView.gameOver(snek);
