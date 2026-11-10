@@ -102,7 +102,7 @@ Each round starts with a red coin. With power-ups enabled, the next seven spawns
 - Reset does not consistently restore all internal game state.
 - Returning to the menu does not explicitly stop the previous timeline.
 - A rendering calculation applies the scale twice.
-- Coin placement has no explicit exit when no valid cell remains.
+
 
 These findings require targeted tests and verification as fixes
 are implemented.
@@ -159,6 +159,8 @@ mismatch between the FXML JavaFX version declaration and the runtime
 dependency. These did not prevent the observed build or launch.
 Compatibility cleanup remains pending.
 
+Coins spawn on a randomly chosen free cell. Collecting the final coin ends the round and clears its sprite from the winning board.
+
 ## Controls
 
 | Key | Action |
@@ -192,3 +194,4 @@ Manual checks also confirmed reversal prevention, pause/resume and reset.
 See [test cases and results](Docs/Testing.md) for evidence and limitations.
 
 Compilation success alone does not verify gameplay correctness.
+

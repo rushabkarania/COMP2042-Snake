@@ -93,7 +93,7 @@ public class GameView {
         gc.setFill(game.getColor());
         gc.fillRect(0, 0, gridCanvas.getWidth(), gridCanvas.getHeight());
 
-        gc.drawImage(coin.getImage(), (coin.getPos().x * game.getMultiplier()) * fullScale, (coin.getPos().y * game.getMultiplier()) * fullScale, game.getMultiplier() * fullScale - 3 * fullScale, game.getMultiplier() * fullScale - 3 * fullScale);
+        drawCoin(coin, gc);
 
         drawSnake(snek);
 
@@ -103,11 +103,19 @@ public class GameView {
         }
     }
 
+    private void drawCoin(Coin coin, GraphicsContext gc) {
+        if (game.gameWon()) return;
+        double cell = game.getMultiplier() * fullScale;
+        double size = cell - 3 * fullScale;
+        var position = coin.getPos();
+        gc.drawImage(coin.getImage(), position.x * cell, position.y * cell, size, size);
+    }
+
     private void drawGrid(Coin coin, Snake snek, GraphicsContext gc) {
         gc.setFill(game.getColor());
         gc.fillRect(0, 0, gridCanvas.getWidth(), gridCanvas.getHeight());
 
-        gc.drawImage(coin.getImage(), (coin.getPos().x * game.getMultiplier()) * fullScale, (coin.getPos().y * game.getMultiplier()) * fullScale, game.getMultiplier() * fullScale - 3 * fullScale, game.getMultiplier() * fullScale - 3 * fullScale);
+        drawCoin(coin, gc);
 
         drawSnake(snek);
     }
@@ -231,3 +239,4 @@ public class GameView {
     }
 
 }
+

@@ -261,3 +261,9 @@ CoinSequenceTest checks the contents of 20 consecutive groups and verifies that 
 Playtesting found that a second silver pickup gave points but left the four blocks in the same positions. Later pickups now relocate one block when a safe cell is available. The other three stay in place on a full wave. If relocation is impossible, the existing layout is preserved. The win target changes only for additional blocks.
 
 Two regression cases check repeated relocation and the no-space fallback. Windows gameplay check pending: compare layouts before and after collecting a second silver, then reset with Tab.
+
+## Coin placement and winning — 10 November 2026
+
+Coin placement scans the board once. On a four-cell board with two snake cells and one obstacle, the test selects the only free cell. A second test collects the final coin, checks the awarded points and win target, and confirms the full board has no spawn position.
+
+112 tests passed using Java 17 and JavaFX 17. Windows Maven verification and visual verification of the winning frame are pending.
