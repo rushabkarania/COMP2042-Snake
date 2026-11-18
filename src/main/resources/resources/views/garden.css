@@ -1,0 +1,28 @@
+.root { -fx-font-family: "DejaVu Sans", "Segoe UI", sans-serif; -fx-font-size: 14px; -fx-background-color: #578a34; }
+.label { -fx-text-fill: white; }
+.game-root { -fx-background-color: #578a34; }
+.hud { -fx-background-color: #4a752c; -fx-padding: 15 18; -fx-min-height: 62; }
+.hud-score { -fx-font-size: 20px; -fx-min-width: 30; }
+.button { -fx-cursor: hand; -fx-background-insets: 0; -fx-focus-color: transparent; -fx-faint-focus-color: transparent; }
+.icon-button { -fx-background-color: transparent; -fx-padding: 4; -fx-min-width: 32; -fx-min-height: 32; -fx-max-width: 32; -fx-max-height: 32; }
+.icon-button:hover { -fx-background-color: rgba(255,255,255,.14); -fx-background-radius: 4; }
+.icon-button:disabled { -fx-opacity: .3; }
+.board-frame { -fx-background-color: #aad751; }
+.board-scrim { -fx-background-color: rgba(18,32,9,.58); }
+.status-bar { -fx-padding: 1 20 10 20; -fx-min-height: 27; -fx-max-height: 27; }
+.level-label, .effect-label { -fx-font-size: 11px; -fx-text-fill: #ecf5da; }
+.score-panel { -fx-background-color: #4fc3f7; -fx-background-radius: 7; -fx-padding: 21 0 0 0; }
+.panel-title { -fx-font-size: 23px; }
+.panel-subtitle { -fx-font-size: 12px; }
+.result-value { -fx-font-size: 25px; }
+.panel-grass { -fx-background-image: url("res/garden/board-tile.png"); -fx-background-repeat: repeat; -fx-background-size: 48 48; }
+.primary-button, .secondary-button { -fx-background-color: #155bd7; -fx-text-fill: white; -fx-font-size: 16px; -fx-padding: 12 18; -fx-background-radius: 5; -fx-min-height: 46; }
+.primary-button:hover, .secondary-button:hover { -fx-background-color: #2470eb; }
+.primary-button:pressed, .secondary-button:pressed { -fx-background-color: #124db7; }
+.secondary-button { -fx-background-color: #155bd7; -fx-font-size: 14px; -fx-min-height: 42; -fx-padding: 10 18; }
+.help-text { -fx-font-size: 13px; }
+.help-controls { -fx-font-size: 12px; -fx-text-alignment: center; -fx-padding: 0 0 18 0; }
+.direction-prompt { -fx-background-color: rgba(38,57,18,.86); -fx-background-radius: 15; -fx-padding: 16 18; }
+.direction-key { -fx-background-color: #fff; -fx-background-radius: 3; -fx-text-fill: #3d571f; -fx-font-size: 21px; -fx-font-weight: bold; -fx-min-width: 27; -fx-min-height: 27; -fx-max-width: 27; -fx-max-height: 27; }
+.direction-message { -fx-font-size: 13px; }
+.tooltip { -fx-font-size: 12px; }
