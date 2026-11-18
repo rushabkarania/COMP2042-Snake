@@ -1,14 +1,11 @@
 package com.comp2042;
 
 import javafx.scene.Scene;
-import javafx.scene.SnapshotParameters;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import java.util.List;
-import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
@@ -25,6 +22,20 @@ public class GameView {
     public Label scoreLabel;
     private boolean gameOverVis = false;
     private boolean gameWonVis = false;
+
+    private List<Point> previousBody = List.of();
+    private Point previousHead = new Point();
+
+    private double progress = 1;
+
+    void beginStep(Snake snake) {
+        previousHead = new Point(snake.getHead());
+        previousBody = List.copyOf(snake.getBody());
+    }
+
+    void setProgress(double fraction) {
+        progress = fraction;
+    }
 
     private Game game;
     private double initX;
@@ -55,11 +66,12 @@ public class GameView {
         gameWonLabel.getStylesheets().add(css);
         gameWonLabel.setVisible(false);
 
-        scoreLabel = new Label("Score: " + game.getScorePoints());
+        scoreLabel = new Label();
         scoreLabel.setId("scoreLabel");
         scoreLabel.getStylesheets().add(css);
-        scoreLabel.setFont(new Font("Arial", 20));
+        scoreLabel.setStyle("-fx-font-size: 16px;");
         scoreLabel.setVisible(true);
+        updateScoreLabel();
     }
 
     public void scaleToFullscreen(boolean fullScreen, Stage primaryStage, Obstacle obstacle, Snake snek, Coin coin) {
@@ -130,81 +142,77 @@ public class GameView {
         List<Point> body = SnakeSpriteSelector.drawingBody(
                 snek.getBody(), head, snek.getDead());
 
-        for (int index = 0; index < body.size(); index++) {
-            drawBody(snek, body, head, index);
-        }
-
-        drawSprite(
-                snek.getImageViewHead(),
-                head,
-                snek.getSnakeDir());
+        double cell = game.getMultiplier() * fullScale;
+        List<javafx.geometry.Point2D> path = bodyPath(body, head, previousBody,
+                previousHead, game.getWidth(), game.getHeight(), progress);
+        drawConnectedBody(path, cell, snek);
+        var tip = path.get(path.size() - 1);
+        paintWrapped(snek.getImageViewHead(), snek.getSnakeDir(), tip.getX(), tip.getY(), cell);
     }
 
-    /**
-     * Draws one tail or body segment.
-     *
-     * @param snek the snake supplying the sprite images
-     * @param body the ordered drawing positions, starting at the tail
-     * @param head the current head position
-     * @param index the segment index
-     */
-    private void drawBody(
-            Snake snek, List<Point> body, Point head, int index) {
+    private void drawConnectedBody(List<javafx.geometry.Point2D> path, double cell, Snake snake) {
+        gc.save();
+        gc.scale(cell, cell);
+        gc.setImageSmoothing(false);
+        gc.setFill(javafx.scene.paint.Color.GREEN);
+        SnakeBodyPainter.paint(new SnakeBodyPainter.Surface() {
+            public void joint(double x, double y, double radius) {
+                gc.fillOval(x - radius, y - radius, 2 * radius, 2 * radius);
+            }
 
-        Point current = body.get(index);
-        Point next = index + 1 < body.size()
-                ? body.get(index + 1)
-                : head;
-
-        if (index == 0) {
-            drawSprite(
-                    snek.getImageViewTail(),
-                    current,
-                    SnakeSpriteSelector.tailRotation(
-                            current, next, game.getWidth(), game.getHeight()));
-            return;
-        }
-
-        Point previous = body.get(index - 1);
-
-        SnakeSpriteSelector.Sprite sprite = SnakeSpriteSelector.select(
-                previous,
-                current,
-                next,
-                game.getWidth(),
-                game.getHeight());
-
-        ImageView image = sprite.corner()
-                ? snek.getImageViewTurn()
-                : snek.getImageViewBody();
-
-        drawSprite(image, current, sprite.rotation());
+            public void strip(double x, double y, double angle, double length, double offset, boolean tail) {
+                var image = (tail ? snake.getImageViewTail() : snake.getImageViewBody()).getImage();
+                // The final 5% of the original tail bitmap is transparent padding.
+                double h = image.getHeight() * (tail ? .95 : 1);
+                gc.save();
+                gc.translate(x, y);
+                gc.rotate(angle);
+                gc.drawImage(image, 0, Math.max(0, 1 - offset - length) * h, image.getWidth(), length * h,
+                        -.5, -length, 1, length);
+                gc.restore();
+            }
+        }, path, game.getWidth(), game.getHeight());
+        gc.restore();
     }
 
-    /**
-     * Draws a rotated image within one scaled board cell.
-     *
-     * @param image the image view containing the sprite
-     * @param position the board position
-     * @param rotation clockwise rotation in degrees
-     */
-    private void drawSprite(
-            ImageView image, Point position, int rotation) {
+    private void paintWrapped(ImageView image, int rotation, double x, double y, double cell) {
+        paintSprite(image, rotation, x, y, cell);
+        if (x < 0) paintSprite(image, rotation, x + game.getWidth(), y, cell);
+        if (x > game.getWidth() - 1) paintSprite(image, rotation, x - game.getWidth(), y, cell);
+        if (y < 0) paintSprite(image, rotation, x, y + game.getHeight(), cell);
+        if (y > game.getHeight() - 1) paintSprite(image, rotation, x, y - game.getHeight(), cell);
+    }
 
-        image.setRotate(rotation);
+    /** Keeps occupied bends fixed while the two endpoints advance along grid edges. */
+    static List<javafx.geometry.Point2D> bodyPath(List<Point> body, Point head,
+            List<Point> oldBody, Point oldHead, int width, int height, double fraction) {
+        var path = new java.util.ArrayList<javafx.geometry.Point2D>();
+        if (fraction < 1 && !oldBody.isEmpty() && oldBody.size() == body.size()) {
+            Point tail = oldBody.get(0);
+            Point next = body.get(0);
+            path.add(new javafx.geometry.Point2D(interpolate(tail.x, next.x, width, fraction),
+                    interpolate(tail.y, next.y, height, fraction)));
+        }
+        for (Point cell : body) path.add(new javafx.geometry.Point2D(cell.x, cell.y));
+        path.add(new javafx.geometry.Point2D(interpolate(oldHead.x, head.x, width, fraction),
+                interpolate(oldHead.y, head.y, height, fraction)));
+        return path;
+    }
 
-        SnapshotParameters params = new SnapshotParameters();
-        params.setFill(Color.TRANSPARENT);
-        Image rotatedImage = image.snapshot(params, null);
+    private void paintSprite(ImageView sprite, int rotation, double x, double y, double cell) {
+        gc.save();
+        gc.translate((x + 0.5) * cell, (y + 0.5) * cell);
+        gc.rotate(rotation);
+        gc.drawImage(sprite.getImage(), -cell / 2, -cell / 2, cell, cell);
+        gc.restore();
+    }
 
-        double cellSize = game.getMultiplier() * fullScale;
-
-        gc.drawImage(
-                rotatedImage,
-                position.x * cellSize,
-                position.y * cellSize,
-                cellSize,
-                cellSize);
+    static double interpolate(int from, int to, int size, double progress) {
+        if (progress >= 1) return to;
+        int delta = to - from;
+        if (delta > 1) delta -= size;
+        if (delta < -1) delta += size;
+        return from + delta * progress;
     }
 
 
@@ -234,8 +242,24 @@ public class GameView {
         }
     }
 
+    void showRecovery() {
+        gameOverLabel.setText("Life lost — press an arrow");
+        gameOverLabel.setVisible(true);
+    }
+
+    void hideRecovery() {
+        gameOverLabel.setText("GAME OVER");
+        gameOverLabel.setVisible(false);
+    }
+
     public void updateScoreLabel() {
-        scoreLabel.setText("Score: " + game.getScorePoints());
+        String next = switch (game.level()) {
+            case 1 -> "/40";
+            case 2 -> "/80";
+            default -> "";
+        };
+        scoreLabel.setText("Lv " + game.level() + "  Score " + game.getScorePoints()
+                + next + "  Lives " + game.hearts());
     }
 
 }

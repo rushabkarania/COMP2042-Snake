@@ -95,6 +95,24 @@ public class Snake {
         return grows;
     }
 
+    /** Place a fresh snake with a clear first step and preserve the current coin. */
+    void findRespawn(Point coin) {
+        for (int offset = 0; offset < gy; offset++) {
+            int row = (gy / 2 + offset) % gy;
+            for (int column = 1; column < gx - 1; column++) {
+                Point left = new Point(column - 1, row);
+                Point center = new Point(column, row);
+                Point right = new Point(column + 1, row);
+                var cells = java.util.List.of(left, center, right);
+                if (cells.contains(coin) || !java.util.Collections.disjoint(cells, obstacle.getObstacles())) continue;
+                head.setLocation(center);
+                body.get(0).setLocation(right);
+                return;
+            }
+        }
+        throw new IllegalStateException("No safe respawn lane");
+    }
+
     public int getBodyDir(int bodyCount) {
         if (bodyCount == 0) {
             return 0;
