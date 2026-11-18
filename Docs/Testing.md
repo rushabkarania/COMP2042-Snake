@@ -267,3 +267,47 @@ Two regression cases check repeated relocation and the no-space fallback. Window
 Coin placement scans the board once. On a four-cell board with two snake cells and one obstacle, the test selects the only free cell. A second test collects the final coin, checks the awarded points and win target, and confirms the full board has no spawn position.
 
 112 tests passed using Java 17 and JavaFX 17. Windows Maven verification and visual verification of the winning frame are pending.
+
+## Buffered turns and movement interpolation
+
+The progressive-levels branch starts from the merged game. The selectable-difficulty experiment is archived separately. The player reported delayed steering. Inspection found that a second legal turn between movement ticks was discarded.
+
+The local JUnit run passed all 115 tests (112 baseline and three MovementTest cases). They cover rapid turns, repeats, opposite inputs, queue capacity, clearing input, and fractional positions across both wrapped edges. Windows checks pending: tap Up then Right while travelling left, pause and resume, reset during a turn, and cross a boundary with the blue power-up. Watch the head and tail at bends. Input-to-display latency has not been measured.
+
+### Short-snake turning animation
+
+Windows playtesting found smooth straight movement but a disconnected-looking tail during a turn at score zero. Independently translating rotated segment sprites could leave a diagonal gap. GameView now draws a continuous rounded body through the occupied bend, keeping the head sprite and advancing the endpoints along grid edges. MovementTest checks the two-cell snake halfway through a right-angle turn. Windows visual confirmation of this revision is pending.
+
+### Restoring the body artwork
+
+A fullscreen playtest at score 55 showed a plain green line behind the head. The continuous-line renderer bypassed the straight, corner and tail images. GameView now draws the original body and corner sprites on their occupied cells and slides the pointed tail and head along the path. Visual confirmation on Windows is pending.
+
+### Turn rendering follow-up
+
+Windows recording: during rapid alternating turns, the head briefly separates from a corner and the tail changes orientation abruptly. The renderer now joins the animated endpoints along the occupied grid edges and tapers the tail along that path. Manual retest pending: repeat a right/down staircase, then reverse the staircase, in windowed and fullscreen play. Check the neck for background-coloured gaps and the tail for a detached triangle.
+
+### Square tail during straight movement
+
+The Windows screenshot at score 5 exposed a straight, square-cut tail. A fixed sprite could cover the previous tapered layer as the tail crossed its cell. The new body renderer produces one patterned silhouette. SnakeBodyPainterTest inspects the actual body pixels at 33 positions across a straight step, checks continuity through a staircase turn at 33 positions, and checks both sides of a wrapped corner. 119 JUnit tests passed. Windows fullscreen playback and input latency remain unverified.
+
+### Fullscreen body sharpness
+
+The score-35 screenshot showed softened body markings beside a sharp head sprite. The body bitmap had antialiased edges and JavaFX filtered it again during enlargement. Body rasterization now uses hard pixel edges and the body draw disables image smoothing. Manual Windows check: compare the head, markings and tail at window size and fullscreen. Frame rate and fullscreen appearance still require a local playtest.
+
+### Fullscreen tail regression after movement smoothing
+
+Compared the submitted working tree with the committed sprite renderer. The animated build generated a low-resolution body bitmap and uploaded the entire board every pulse. The input queue was separate from this rendering path. Restored the original body and tail artwork using cropped sprite strips along the animated path. Replaced timer rounding on ordinary late pulses with a fixed step boundary.
+
+The pixel checks use the original PNGs to exercise straight movement and staircase turns at 33 positions, plus a wrapped corner. A clock test covers both a 16 ms late pulse and a long stall. Manual Windows verification is pending for fullscreen motion and frame pacing.
+
+### Coin pickup pause
+
+CoinImageTest checks that separate red and gold spawns reuse their respective decoded images. All 121 JUnit tests passed. Windows playtest pending: collect several coins while moving straight and check that the head continues moving through each pickup. The tail stays in place for one movement step during growth.
+
+## Progressive levels and recovery
+
+The full JUnit suite passed locally using Java 21, ECJ and JUnit Console: 125 tests, zero failures or skips. ProgressionTest covers threshold crossings, exhausting lives, reset, patrol freeze and reversal, and a safe first step after respawn. Windows gameplay checks are pending.
+
+Run the Maven suite, then check the HUD at 40 and 80 points. In level 3 collect silver and watch the patrol resume after twelve steps. Hit a wall three times, checking that each collision consumes only one life, that movement waits for input after recovery, and that Tab restores level one and three lives.
+
+Windows playtesting at level 2, score 50/80, showed the lives count truncated to an ellipsis. Level 3 showed Lives 0 at game over. Reduced the windowed HUD font size and spacing. Repeat the level 2 collision check at normal window size to confirm Lives 2 is fully visible.

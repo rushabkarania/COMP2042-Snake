@@ -94,6 +94,44 @@ public class Obstacle {
         return added;
     }
 
+    private Point patrol;
+    private int originX;
+    private int direction = 1;
+    private int delay;
+    private int frozenSteps;
+
+    /** Turn an existing block into a horizontal patrol without adding an occupied cell. */
+    void startPatrol() {
+        if (patrol != null || obstacles.isEmpty()) return;
+        patrol = obstacles.get(0);
+        originX = patrol.x;
+        direction = 1;
+        delay = 0;
+    }
+
+    void freezePatrol() {
+        frozenSteps = 12;
+    }
+
+    /** Advance on every second snake step. Reverse at a blocked cell or route endpoint. */
+    void advancePatrol(Snake snake, Point coin) {
+        if (patrol == null) return;
+        if (frozenSteps > 0) {
+            frozenSteps--;
+            return;
+        }
+        delay = (delay + 1) % 2;
+        if (delay != 0) return;
+        Point next = new Point(patrol.x + direction, patrol.y);
+        if (next.x < 0 || next.x >= x || Math.abs(next.x - originX) > 2
+                || obstacles.contains(next) || next.equals(coin)
+                || next.equals(snake.getHead()) || snake.getBody().contains(next)) {
+            direction = -direction;
+            return;
+        }
+        patrol.setLocation(next);
+    }
+
     public Color getColor() {
         return color;
     }
@@ -104,5 +142,7 @@ public class Obstacle {
 
     public void reset() {
         obstacles.clear();
+        patrol = null;
+        frozenSteps = 0;
     }
 }

@@ -6,7 +6,25 @@ public class Game {
     private Color color = Color.web("feffe4");
     private int width;
     private int height;
+    private int hearts;
     private int score;
+
+    /** Current stage, based on total points earned this run. */
+    public int level() {
+        if (scorePoints >= 80) return 3;
+        if (scorePoints >= 40) return 2;
+        return 1;
+    }
+
+    public int hearts() {
+        return hearts;
+    }
+
+    /** Spend a heart and report whether the player can respawn. */
+    public boolean loseHeart() {
+        hearts = Math.max(0, hearts - 1);
+        return hearts > 0;
+    }
     private int maxScore;
     private double multiplier;
     private int scorePoints;
@@ -38,7 +56,7 @@ public class Game {
     }
 
     public boolean gameWon() {
-        return score == maxScore;
+        return score >= maxScore;
     }
 
     public void incScore() {
@@ -61,6 +79,7 @@ public class Game {
         maxScore = width * height - 2;
         score = 0;
         scorePoints = 0;
+        hearts = 3;
     }
 
     public Color getColor() {

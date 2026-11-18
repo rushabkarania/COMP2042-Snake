@@ -10,9 +10,29 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class Coin {
     private Point pos;
-    private Image image = new Image("resources/views/res/redcoin.png");
+    private final Sprite sprite;
+
+    enum Sprite {
+        RED("red"), BLUE("blue"), GOLD("gold"), SILVER("silver"), RAINBOW("rainbow");
+
+        final Image image;
+
+        Sprite(String name) {
+            String path = "/resources/views/res/" + name + "coin.png";
+            try (var stream = java.util.Objects.requireNonNull(Coin.class.getResourceAsStream(path), path)) {
+                image = new Image(stream);
+            } catch (java.io.IOException failure) {
+                throw new IllegalStateException(path, failure);
+            }
+        }
+    }
 
     public Coin(int x, int y, Snake snek, Obstacle obstacle) {
+        this(x, y, snek, obstacle, Sprite.RED);
+    }
+
+    Coin(int x, int y, Snake snek, Obstacle obstacle, Sprite sprite) {
+        this.sprite = sprite;
         pos = choosePosition(x, y, snek, obstacle)
                 .orElseThrow(() -> new IllegalStateException("Cannot create a coin on a full board"));
     }
@@ -45,7 +65,7 @@ public class Coin {
     }
 
     public Image getImage() {
-        return image;
+        return sprite.image;
     }
 }
 
