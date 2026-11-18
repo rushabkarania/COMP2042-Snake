@@ -13,8 +13,8 @@ class CoinSequenceTest {
         for (int group = 0; group < 20; group++) {
             var draws = new ArrayList<CoinSequence.Type>();
             for (int i = 0; i < 7; i++) draws.add(sequence.next());
-            assertEquals(4, Collections.frequency(draws, RED));
-            for (var special : new CoinSequence.Type[]{GOLD, BLUE, RAINBOW}) {
+            assertEquals(3, Collections.frequency(draws, RED));
+            for (var special : new CoinSequence.Type[]{GOLD, BLUE, RAINBOW, SHRINK}) {
                 assertEquals(1, Collections.frequency(draws, special));
             }
             assertEquals(SILVER, sequence.next());

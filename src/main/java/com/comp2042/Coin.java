@@ -13,7 +13,7 @@ public class Coin {
     private final Sprite sprite;
 
     enum Sprite {
-        RED("red"), BLUE("blue"), GOLD("gold"), SILVER("silver"), RAINBOW("rainbow");
+        RED("red"), BLUE("blue"), GOLD("gold"), SILVER("silver"), RAINBOW("rainbow"), SHRINK("shrink");
 
         final Image image;
 
@@ -55,13 +55,20 @@ public class Coin {
         return Optional.of(free.get(ThreadLocalRandom.current().nextInt(free.size())));
     }
 
+    /** Places a known collectible for scripted boards and deterministic tests. */
+    Coin(Point position, Sprite sprite) {
+        this.pos = new Point(java.util.Objects.requireNonNull(position));
+        this.sprite = java.util.Objects.requireNonNull(sprite);
+    }
+
+    CoinSequence.Type type() { return CoinSequence.Type.valueOf(sprite.name()); }
+
     public Point getPos() {
         return new Point(pos);
     }
 
     public int getPoints() {
-        int points = 5;
-        return points;
+        return sprite == Sprite.GOLD ? 15 : 5;
     }
 
     public Image getImage() {

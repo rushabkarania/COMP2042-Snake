@@ -27,20 +27,12 @@ class ProgressionTest {
         assertEquals(1, game.level());
     }
 
-    @Test void frozenPatrolResumesAndReversesAtCoin() {
-        Obstacle obstacles = new Obstacle(20, 20);
-        Point block = new Point(4, 4);
-        obstacles.getObstacles().add(block);
-        Snake snake = new Snake(20, 20, false, obstacles);
-        Point coin = new Point(6, 4);
-        obstacles.startPatrol();
-        obstacles.freezePatrol();
-        for (int i = 0; i < 12; i++) obstacles.advancePatrol(snake, coin);
-        assertEquals(new Point(4, 4), block);
-        for (int i = 0; i < 2; i++) obstacles.advancePatrol(snake, coin);
-        assertEquals(new Point(5, 4), block);
-        for (int i = 0; i < 4; i++) obstacles.advancePatrol(snake, coin);
-        assertEquals(new Point(4, 4), block);
+    @Test void stageTwoSchedulesHedgesBeforeTheyBecomeSolid() {
+        Obstacle obstacles=new Obstacle(20,20);Snake snake=new Snake(20,20,false,obstacles);
+        Point coin=new Point(17,17);obstacles.requestLayout(40,snake,coin);
+        assertTrue(obstacles.getObstacles().isEmpty());assertFalse(obstacles.pendingCells().isEmpty());
+        for(int i=0;i<12;i++)obstacles.advance(snake,coin,0);
+        assertFalse(obstacles.getObstacles().isEmpty());assertTrue(obstacles.pendingCells().isEmpty());
     }
 
     @Test void respawnHasClearBodyAndFirstStep() {

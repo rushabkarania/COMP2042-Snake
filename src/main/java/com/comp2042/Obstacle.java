@@ -1,148 +1,94 @@
 package com.comp2042;
 
+import java.awt.Point;
+import java.util.*;
 import javafx.scene.paint.Color;
 
-import java.awt.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-
+/** Warned, stationary hedge layouts with safe replacement and temporary two-cell gates. */
 public class Obstacle {
-    private Color color = Color.BLACK;
-    private ArrayList<Point> obstacles = new ArrayList<>();
-    private int x;
-    private int y;
+    static final int LAYOUT_WARNING_MOVES=12;
+    static final int GATE_WARNING_MOVES=8;
+    private final int width,height;
+    private final ArrayList<Point> obstacles=new ArrayList<>();
+    private List<Point> fullLayout=List.of(),pending=List.of(),gate=List.of();
+    private int warningMoves,gateWarning=-1,requestedRevision=-1,completedRevision=-1,retryMoves;
 
-    public Obstacle(int x, int y) {
-       this.x = x;
-       this.y = y;
+    public Obstacle(int width,int height) { this.width=width;this.height=height; }
+    public Color getColor() { return Color.web("#28713d"); }
+    /** Live collision cells, excluding the temporarily opened gate. */
+    public ArrayList<Point> getObstacles() { return obstacles; }
+    public List<Point> pendingCells() { return pending.stream().map(Point::new).toList(); }
+    public List<Point> gateCells() { return gate.stream().map(Point::new).toList(); }
+    public int warningMoves() { return warningMoves; }
+    public int gateWarningMoves() { return gateWarning; }
+    public boolean hasPendingLayout() { return !pending.isEmpty(); }
+
+    /** Requests a new pattern at 40/80 points and each additional 80 points. */
+    void requestLayout(int score,Snake snake,Point coin) {
+        int revision=HedgeLayouts.revision(score);
+        if(revision<0)return;
+        if(revision==requestedRevision&&(!pending.isEmpty()||retryMoves>0||completedRevision==revision))return;
+        if(revision!=requestedRevision) { pending=List.of();retryMoves=0; }
+        requestedRevision=revision;
+        List<Point> proposal=HedgeLayouts.propose(width,height,score,snake,coin,obstacles);
+        if(proposal.isEmpty()) { retryMoves=12;return; }
+        requestedRevision=revision;pending=proposal;warningMoves=LAYOUT_WARNING_MOVES;retryMoves=0;
     }
 
-    private static final int MAX_OBSTACLES = 4;
-    private static final int MIN_DISTANCE = 4;
-
-    private int quadrant(Point cell) {
-        return (cell.x < x / 2 ? 0 : 1) + (cell.y < y / 2 ? 0 : 2);
-    }
-
-    private boolean hasClearance(Point candidate, Point head) {
-        if (candidate.distanceSq(head) < MIN_DISTANCE * MIN_DISTANCE) return false;
-        for (Point existing : obstacles) {
-            if (quadrant(candidate) == quadrant(existing)
-                    || candidate.distanceSq(existing) < MIN_DISTANCE * MIN_DISTANCE) return false;
-        }
-        return true;
-    }
-
-    /**
-     * Places up to the requested number of obstacles on distinct free cells.
-     * @return the number actually added
-     */
-    public int newObstacles(Snake snake, Coin coin, int amount) {
-        return onSilverPickup(snake, coin.getPos(), amount);
-    }
-
-    /** Moves one existing block when a safe replacement exists, then fills empty quarters. */
-    int onSilverPickup(Snake snake, Point coinPosition, int amount) {
-        if (amount <= 0) return 0;
-        var previous = new ArrayList<>(obstacles);
-        Collections.shuffle(previous);
-        for (Point old : previous) {
-            obstacles.remove(old);
-            // Reject the old cell so a successful relocation always changes the board.
-            if (placeObstacles(snake, coinPosition, 1, old) == 1) break;
-            obstacles.add(old);
-        }
-        // Only added cells reduce the win target. Relocation preserves the total.
-        return placeObstacles(snake, coinPosition, amount);
-    }
-
-    int placeObstacles(Snake snake, Point coinPosition, int amount) {
-        return placeObstacles(snake, coinPosition, amount, null);
-    }
-
-    private int placeObstacles(Snake snake, Point coinPosition, int amount, Point old) {
-        int limit = Math.min(amount, MAX_OBSTACLES - obstacles.size());
-        if (limit <= 0) return 0;
-
-        var occupied = new HashSet<>(obstacles);
-        occupied.addAll(snake.getBody());
-        occupied.add(snake.getHead());
-        occupied.add(coinPosition);
-
-        var free = new ArrayList<Point>();
-        for (int row = 3; row < y - 2; row++) {
-            for (int column = 1; column < x - 1; column++) {
-                Point cell = new Point(column, row);
-                if (!occupied.contains(cell) && !cell.equals(old)
-                        && (old == null || quadrant(cell) == quadrant(old))) free.add(cell);
+    /** Called only after a successful movement; paused/recovery states cannot consume warnings. */
+    void advance(Snake snake,Point coin,int gapMoves) {
+        if(retryMoves>0)retryMoves--;
+        if(!pending.isEmpty()) {
+            if(warningMoves>0)warningMoves--;
+            if(warningMoves==0&&HedgeLayouts.safeTransition(pending,obstacles,snake,coin,width,height)) {
+                installLayout(pending);pending=List.of();completedRevision=requestedRevision;
             }
         }
-        Collections.shuffle(free);
-        int added = 0;
-        Point head = snake.getHead();
-        // A collected coin shares the head cell. Keep space for its replacement.
-        int available = x * y - occupied.size();
-        int reserve = head.equals(coinPosition) ? 1 : 0;
-        for (Point candidate : free) {
-            if (added >= limit || added >= available - reserve) break;
-            if (hasClearance(candidate, head)) {
-                obstacles.add(candidate);
-                added++;
+        if(gapMoves>0) {
+            gateWarning=-1;
+            if(gate.isEmpty())openGate(snake);
+        } else if(!gate.isEmpty()) {
+            if(gateWarning<0)gateWarning=GATE_WARNING_MOVES;
+            else if(gateWarning>0)gateWarning--;
+            if(gateWarning==0&&HedgeLayouts.safeTransition(fullLayout,obstacles,snake,coin,width,height)) {
+                obstacles.clear();fullLayout.forEach(p->obstacles.add(new Point(p)));gate=List.of();gateWarning=-1;
             }
         }
-        return added;
     }
 
-    private Point patrol;
-    private int originX;
-    private int direction = 1;
-    private int delay;
-    private int frozenSteps;
-
-    /** Turn an existing block into a horizontal patrol without adding an occupied cell. */
-    void startPatrol() {
-        if (patrol != null || obstacles.isEmpty()) return;
-        patrol = obstacles.get(0);
-        originX = patrol.x;
-        direction = 1;
-        delay = 0;
+    /** Installs a scripted or validated pattern and discards a gate from the previous layout. */
+    void installLayout(Collection<Point> cells) {
+        fullLayout=cells.stream().map(Point::new).distinct().toList();
+        obstacles.clear();fullLayout.forEach(p->obstacles.add(new Point(p)));
+        gate=List.of();gateWarning=-1;
     }
 
-    void freezePatrol() {
-        frozenSteps = 12;
-    }
-
-    /** Advance on every second snake step. Reverse at a blocked cell or route endpoint. */
-    void advancePatrol(Snake snake, Point coin) {
-        if (patrol == null) return;
-        if (frozenSteps > 0) {
-            frozenSteps--;
-            return;
+    private void openGate(Snake snake) {
+        var candidates=new ArrayList<List<Point>>();
+        Set<Point> cells=new HashSet<>(obstacles);
+        for(Point first:obstacles)for(Point second:List.of(new Point(first.x+1,first.y),new Point(first.x,first.y+1))) {
+            if(cells.contains(second))candidates.add(List.of(new Point(first),second));
         }
-        delay = (delay + 1) % 2;
-        if (delay != 0) return;
-        Point next = new Point(patrol.x + direction, patrol.y);
-        if (next.x < 0 || next.x >= x || Math.abs(next.x - originX) > 2
-                || obstacles.contains(next) || next.equals(coin)
-                || next.equals(snake.getHead()) || snake.getBody().contains(next)) {
-            direction = -direction;
-            return;
+        Point head=snake.getHead();
+        candidates.sort(Comparator.comparingDouble(pair->pair.stream().mapToDouble(p->p.distanceSq(head)).sum()));
+        // Prefer a genuine opening through a run, leaving hedge cells on both sides when possible.
+        List<Point> chosen=null;
+        for(List<Point> pair:candidates) {
+            Point a=pair.get(0),b=pair.get(1);int dx=b.x-a.x,dy=b.y-a.y;
+            if(cells.contains(new Point(a.x-dx,a.y-dy))&&cells.contains(new Point(b.x+dx,b.y+dy))) {chosen=pair;break;}
         }
-        patrol.setLocation(next);
+        if(chosen==null&&!candidates.isEmpty())chosen=candidates.get(0);
+        if(chosen!=null) { gate=chosen;obstacles.removeAll(gate); }
     }
 
-    public Color getColor() {
-        return color;
+    public String warningText() {
+        var messages=new ArrayList<String>();
+        if(!pending.isEmpty())messages.add(warningMoves>0?"Hedges change in "+warningMoves+" steps":"Hedges waiting for clear space");
+        if(!gate.isEmpty()&&gateWarning>=0)messages.add(gateWarning>0?"Gap closes in "+gateWarning+" steps":"Gap waiting for clear space");
+        return String.join(" · ",messages);
     }
-
-    public ArrayList<Point> getObstacles() {
-        return obstacles;
-    }
-
     public void reset() {
-        obstacles.clear();
-        patrol = null;
-        frozenSteps = 0;
+        obstacles.clear();fullLayout=List.of();pending=List.of();gate=List.of();
+        warningMoves=0;gateWarning=-1;requestedRevision=-1;completedRevision=-1;retryMoves=0;
     }
 }

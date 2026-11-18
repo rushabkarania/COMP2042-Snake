@@ -14,19 +14,22 @@ class CoinPlacementTest {
     }
 
     @Test
-    void collectingLastReachableCoinFillsBoardAndMeetsWinTarget() {
+    void collectingFinalCellContinuesWithBonusAndSpaceForAnotherCoin() throws Exception {
         Obstacle obstacles = new Obstacle(4, 1);
         Snake snake = new Snake(4, 1, false, obstacles);
         Game game = new Game(4, 1, true, 'N');
         obstacles.getObstacles().add(new Point(0, 0));
-        game.decMaxScore(1);
-        assertFalse(game.gameWon());
-        Point finalCoin = Coin.choosePosition(4, 1, snake, obstacles).orElseThrow();
-        assertTrue(snake.move('L', finalCoin));
-        game.incScore();
-        game.addPoints(5);
-        assertTrue(game.gameWon());
-        assertEquals(5, game.getScorePoints());
-        assertTrue(Coin.choosePosition(4, 1, snake, obstacles).isEmpty());
+        var path = java.nio.file.Files.createTempDirectory("snake-full-board").resolve("best.txt");
+        var session = new GameSession(game, obstacles, new HighScoreStore(path), snake,
+                new Coin(new Point(1, 0), Coin.Sprite.RED));
+        session.resume();
+        assertTrue(session.step('L'));
+        assertEquals(GameSession.State.RUNNING, session.state());
+        assertEquals(30, game.getScorePoints());
+        assertEquals(1, snake.getBody().size());
+        assertFalse(snake.getHead().equals(session.coin().getPos()));
+        assertFalse(snake.getBody().contains(session.coin().getPos()));
+        assertFalse(obstacles.getObstacles().contains(session.coin().getPos()));
+        assertTrue(session.notice().contains("Garden cleared"));
     }
 }

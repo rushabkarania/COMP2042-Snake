@@ -1,186 +1,267 @@
 package com.comp2042;
 
-import javafx.scene.Scene;
+import java.awt.Point;
+import java.util.List;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.Label;
+import javafx.scene.control.*;
 import javafx.scene.image.ImageView;
-import java.util.List;
-import javafx.scene.text.Font;
-import javafx.stage.Screen;
-import javafx.stage.Stage;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.paint.ImagePattern;
 
-import java.awt.*;
-
+/** Board-first arcade view: one HUD row and a compact start/pause/game-over panel. */
 public class GameView {
+    private final GameSession session;
+    private final Game game;
+    private final BorderPane root = new BorderPane();
+    private final Canvas gridCanvas = new Canvas(560,560);
+    private final GraphicsContext gc = gridCanvas.getGraphicsContext2D();
+    private final StackPane arena = new StackPane();
+    private final StackPane board = new StackPane();
+    private final StackPane scrim = new StackPane();
+    private final VBox card = new VBox(10);
+    private final VBox directionPrompt = new VBox(9);
+    private final Label scoreLabel = label("0","hud-score");
+    private final Label bestLabel = label("0","hud-score");
+    private final Label levelLabel = label("Level 1","level-label");
+    private final Label effectLabel = label("","effect-label");
+    private final HBox hearts = new HBox(3);
+    private final Button pause = iconButton("pause","Pause (P)");
+    private final Button mute = iconButton("sound","Mute (M)");
+    private final Button full = iconButton("fullscreen","Fullscreen (F)");
+    private final Button close = iconButton("close","Close game");
+    private Runnable resumeAction=()->{};
+    private Runnable restartAction=()->{};
+    private GameSession.State shownState;
+    private boolean help;
+    private boolean waitingForArrow;
+    private List<Point> previousBody=List.of();
+    private Point previousHead=new Point();
+    private double progress=1;
+    private javafx.geometry.Point2D renderedHead;
+    javafx.geometry.Point2D renderedHead() { return renderedHead; }
 
-    public Canvas gridCanvas;
-    public GraphicsContext gc;
-
-    public Label gameOverLabel;
-    public Label gameWonLabel;
-    public Label scoreLabel;
-    private boolean gameOverVis = false;
-    private boolean gameWonVis = false;
-
-    private List<Point> previousBody = List.of();
-    private Point previousHead = new Point();
-
-    private double progress = 1;
-
-    void beginStep(Snake snake) {
-        previousHead = new Point(snake.getHead());
-        previousBody = List.copyOf(snake.getBody());
+    public GameView(GameSession session) {
+        this.session=session; game=session.game();
+        root.getStyleClass().add("game-root"); root.setId("game-root"); root.setFocusTraversable(true);
+        root.setTop(makeHeader());
+        board.setId("game-board"); board.setMinSize(0,0);
+        board.getStyleClass().add("board-frame");
+        scrim.setId("state-overlay"); scrim.getStyleClass().add("board-scrim");
+        scrim.setManaged(false); scrim.setMinSize(0,0);
+        card.setAlignment(Pos.CENTER); card.setMinWidth(280); card.setPrefWidth(280); card.setMaxWidth(280);
+        card.setMaxHeight(Region.USE_PREF_SIZE);
+        card.layoutBoundsProperty().addListener((value,before,after)->fitCard());
+        scrim.getChildren().add(card);
+        makeDirectionPrompt();
+        board.getChildren().addAll(gridCanvas,directionPrompt,scrim);
+        StackPane.setAlignment(directionPrompt,Pos.TOP_CENTER);
+        StackPane.setMargin(directionPrompt,new Insets(36,0,0,0));
+        arena.getChildren().add(board); arena.setPadding(new Insets(20,20,8,20)); arena.setMinSize(0,0);
+        root.setCenter(arena);
+        Region space=new Region(); HBox.setHgrow(space,Priority.ALWAYS);
+        HBox footer=new HBox(12,levelLabel,space,effectLabel);
+        effectLabel.setMaxWidth(Double.MAX_VALUE);effectLabel.setAlignment(Pos.CENTER_RIGHT);
+        HBox.setHgrow(effectLabel,Priority.ALWAYS);
+        footer.getStyleClass().add("status-bar"); footer.setAlignment(Pos.CENTER_LEFT);
+        root.setBottom(footer);
+        arena.widthProperty().addListener((value,before,after)->resizeBoard());
+        arena.heightProperty().addListener((value,before,after)->resizeBoard());
+        beginStep(session.snake()); refresh();
     }
 
-    void setProgress(double fraction) {
-        progress = fraction;
-    }
+    public BorderPane root() { return root; }
+    void waitForArrow() { waitingForArrow=true;help=false;updateCard(); }
+    void showStartScreen() { waitingForArrow=false;help=false;updateCard(); }
 
-    private Game game;
-    private double initX;
-    private double initY;
-    private double fullScale = 1;
-    private boolean fullsize = false;
-
-    public GameView(Game game) {
-        this.game = game;
-    }
-
-    public void makeScene(Scene scene, Snake snek, Coin coin) {
-        Scene gameScene = scene;
-        gridCanvas = new Canvas(gameScene.getWidth(), gameScene.getHeight());
-        initX = scene.getWidth();
-        initY = scene.getHeight();
-        gc = gridCanvas.getGraphicsContext2D();
-        drawGrid(coin, snek, gc);
-
-        gameOverLabel = new Label("GAME OVER");
-        gameOverLabel.setId("gameOverLabel");
-        String css = "resources/views/styling.css";
-        gameOverLabel.getStylesheets().add(css);
-        gameOverLabel.setVisible(false);
-
-        gameWonLabel = new Label("YOU WON!");
-        gameWonLabel.setId("gameWonLabel");
-        gameWonLabel.getStylesheets().add(css);
-        gameWonLabel.setVisible(false);
-
-        scoreLabel = new Label();
-        scoreLabel.setId("scoreLabel");
-        scoreLabel.getStylesheets().add(css);
-        scoreLabel.setStyle("-fx-font-size: 16px;");
-        scoreLabel.setVisible(true);
-        updateScoreLabel();
-    }
-
-    public void scaleToFullscreen(boolean fullScreen, Stage primaryStage, Obstacle obstacle, Snake snek, Coin coin) {
-        primaryStage.setFullScreen(fullScreen);
-
-        double xScaling = Screen.getPrimary().getVisualBounds().getHeight() / initY;
-        double yScaling = Screen.getPrimary().getVisualBounds().getWidth() / initX;
-
-        if (fullScreen && !fullsize) {
-            if (xScaling < yScaling) {
-                fullScale = xScaling;
-            } else {
-                fullScale = yScaling;
-            }
-            gridCanvas.setWidth(gridCanvas.getWidth() * fullScale);
-            gridCanvas.setHeight(gridCanvas.getHeight() * fullScale);
-            fullsize = true;
-        } else if (!fullScreen) {
-            fullScale = 1;
-            gridCanvas.setWidth(initX);
-            gridCanvas.setHeight(initY);
-            fullsize = false;
+    private void makeDirectionPrompt() {
+        directionPrompt.setId("direction-prompt");directionPrompt.getStyleClass().add("direction-prompt");
+        directionPrompt.setAlignment(Pos.CENTER);directionPrompt.setMaxSize(Region.USE_PREF_SIZE,Region.USE_PREF_SIZE);
+        directionPrompt.setMouseTransparent(true);
+        GridPane keys=new GridPane();keys.setHgap(4);keys.setVgap(4);keys.setAlignment(Pos.CENTER);
+        String[] arrows={"↑","←","↓","→"};int[][] positions={{1,0},{0,1},{1,1},{2,1}};
+        for(int i=0;i<arrows.length;i++) {
+            Label key=label(arrows[i],"direction-key");key.setAlignment(Pos.CENTER);
+            keys.add(key,positions[i][0],positions[i][1]);
         }
+        Label message=label("Press an arrow key","direction-message");message.setId("direction-message");
+        directionPrompt.getChildren().addAll(keys,message);
+    }
+    void beginStep(Snake snake) { previousHead=snake.getHead(); previousBody=List.copyOf(snake.getBody()); }
+    void setProgress(double fraction) { progress=fraction; }
+    private double cell() { return gridCanvas.getWidth()/game.getWidth(); }
 
-        gameOverLabel.setFont(new Font("Arial", 25 * fullScale));
-        gameWonLabel.setFont(new Font("Arial", 25 * fullScale));
-        drawGrid(coin, snek, obstacle, gc, false, 0);
+    void bindActions(Runnable resume,Runnable togglePause,Runnable restart,Runnable menu,Runnable toggleMute,Runnable fullscreen) {
+        resumeAction=resume; restartAction=restart;
+        pause.setOnAction(event->togglePause.run()); mute.setOnAction(event->toggleMute.run());
+        full.setOnAction(event->fullscreen.run()); close.setOnAction(event->menu.run());
+    }
+    void setMuted(boolean muted) {
+        mute.setGraphic(UiIcons.icon(muted?"muted":"sound"));
+        mute.setAccessibleText(muted?"Sound off. Unmute (M)":"Sound on. Mute (M)");
+        mute.setTooltip(new Tooltip(mute.getAccessibleText()));
     }
 
-    public void drawGrid(Coin coin, Snake snek, Obstacle obstacle, GraphicsContext gc, boolean a, int b) {
-        gc.setFill(game.getColor());
-        gc.fillRect(0, 0, gridCanvas.getWidth(), gridCanvas.getHeight());
+    private HBox makeHeader() {
+        scoreLabel.setId("score-value");bestLabel.setId("best-value");hearts.setId("lives-icons");mute.setId("sound-toggle");
+        ImageView points=GardenAssets.icon("points",27); points.setId("score-icon");
+        points.setAccessibleText("Total points from all pickups");
+        HBox score=new HBox(7,points,scoreLabel);
+        HBox best=new HBox(7,GardenAssets.icon("trophy",27),bestLabel);
+        score.setAlignment(Pos.CENTER_LEFT);best.setAlignment(Pos.CENTER_LEFT);hearts.setAlignment(Pos.CENTER_LEFT);
+        Tooltip.install(score,new Tooltip("Score"));Tooltip.install(best,new Tooltip("Personal best"));
+        Region space=new Region();HBox.setHgrow(space,Priority.ALWAYS);
+        HBox actions=new HBox(2,pause,full,mute,close);actions.setAlignment(Pos.CENTER_RIGHT);
+        HBox header=new HBox(19,score,best,hearts,space,actions);header.setAlignment(Pos.CENTER_LEFT);
+        header.getStyleClass().add("hud");return header;
+    }
 
-        drawCoin(coin, gc);
+    private static ImageView coinIcon(CoinSequence.Type type,int size) {
+        ImageView icon=new ImageView(GardenAssets.coinThumbnail(type));
+        icon.setFitWidth(size);icon.setFitHeight(size);icon.setPreserveRatio(true);return icon;
+    }
+    private static Button iconButton(String name,String help) {
+        Button button=button("","icon-button");button.setGraphic(UiIcons.icon(name));
+        button.setAccessibleText(help);button.setTooltip(new Tooltip(help));return button;
+    }
+    private void resizeBoard() {
+        double side=Math.floor(Math.min(arena.getWidth()-40,arena.getHeight()-28));
+        if(side<64)return;
+        board.setMaxSize(side,side);board.setPrefSize(side,side);
+        gridCanvas.setWidth(side);gridCanvas.setHeight(side);
+        scrim.resizeRelocate(0,0,side,side);fitCard();render();
+    }
+    private void fitCard() {
+        double h=card.getLayoutBounds().getHeight(),w=card.getLayoutBounds().getWidth();
+        if(h<=0||w<=0)return;
+        double scale=Math.min(1,Math.min((gridCanvas.getHeight()-20)/h,(gridCanvas.getWidth()-20)/w));
+        card.setScaleX(scale);card.setScaleY(scale);
+    }
 
-        drawSnake(snek);
+    void refresh() { updateHud(); render(); }
 
-        gc.setFill(obstacle.getColor());
-        for (Point point : obstacle.getObstacles()) {
-            gc.fillRect(point.x * game.getMultiplier() * fullScale, point.y * game.getMultiplier() * fullScale, game.getMultiplier() * fullScale, game.getMultiplier() * fullScale);
+    /** Updates controls once per logical movement, leaving painting to the animation pulse. */
+    void updateHud() {
+        scoreLabel.setText(Integer.toString(game.getScorePoints()));bestLabel.setText(Integer.toString(session.best()));
+        if(!Integer.valueOf(game.hearts()).equals(hearts.getUserData())) {
+            hearts.setUserData(game.hearts());hearts.getChildren().clear();
+            for(int i=0;i<3;i++)hearts.getChildren().add(GardenAssets.icon(i<game.hearts()?"heart":"heart-empty",19));
+        }
+        hearts.setAccessibleText(game.hearts()+" lives remaining");
+        levelLabel.setText("Level "+game.level());
+        String next=game.level()==1?"Hedges at 40 points":game.level()==2?"New hedge layouts at 80 points":"Layouts change every 80 points";
+        Tooltip.install(levelLabel,new Tooltip(next));
+        var effects=new java.util.ArrayList<String>();
+        for(var effect:PowerUpState.Effect.values())if(session.effects().active(effect))
+            effects.add(switch(effect) {case WRAP->"Edge crossing";case RUSH->"Speed boost";case GAP->"Open passage";}
+                    +" "+session.effects().steps(effect)+" steps");
+        String warning=session.obstacles().warningText();
+        if(!warning.isEmpty())effects.add(0,warning);
+        effectLabel.setText(String.join("   ·   ",effects));
+        effectLabel.setAccessibleText("Active effects, remaining grid steps: "+effectLabel.getText());
+        effectLabel.setTooltip(new Tooltip("One step = one square moved. Countdown stops while waiting or paused.\n"+effectLabel.getText()));
+        pause.setGraphic(UiIcons.icon(session.state()==GameSession.State.PAUSED?"play":"pause"));
+        pause.setDisable(session.state()!=GameSession.State.RUNNING&&session.state()!=GameSession.State.PAUSED);
+        if(shownState!=session.state()) { shownState=session.state();help=false;waitingForArrow=false;updateCard(); }
+    }
+
+    private void updateCard() {
+        boolean ready=session.state()==GameSession.State.READY&&waitingForArrow;
+        boolean recovering=session.state()==GameSession.State.RECOVERY;
+        directionPrompt.setVisible(ready||recovering);
+        directionPrompt.setAccessibleText(recovering?"Press an arrow key to continue":"Press an arrow key to start");
+        ((Label)directionPrompt.lookup("#direction-message")).setText(recovering?"Arrow key to continue":"Press an arrow key");
+        boolean visible=session.state()!=GameSession.State.RUNNING && !recovering && !ready;
+        scrim.setVisible(visible);
+        if(!visible)return;
+        card.getChildren().clear();var state=session.state();
+        VBox panel=new VBox(14);panel.setAlignment(Pos.TOP_CENTER);panel.getStyleClass().add("score-panel");
+        javafx.scene.shape.Rectangle clip=new javafx.scene.shape.Rectangle();
+        clip.widthProperty().bind(panel.widthProperty());clip.heightProperty().bind(panel.heightProperty());
+        clip.setArcWidth(14);clip.setArcHeight(14);panel.setClip(clip);
+        String title=help?"How to play":switch(state) {case READY->"Snake";case PAUSED->"Paused";case RECOVERY->"Life lost";default->"Game over";};
+        Label heading=label(title,"panel-title");heading.setId("state-title");panel.getChildren().add(heading);
+        if(help) {
+            String[] descriptions={"+5 points · grow","+15 points · grow","Cross board edges · 48 steps","Move faster · 40 steps","Hedge passage · 48 steps","Shorten tail by 3 squares"};
+            String[] details={"Earn 5 points and grow by one square.","Earn 15 points and grow by one square.",
+                "Earn 5 points and grow. Cross a board edge to appear on the opposite side for 48 steps.",
+                "Earn 5 points and grow. Temporarily move faster for 40 steps.",
+                "Earn 5 points and grow. Open two neighbouring hedge squares for 48 steps.",
+                "Earn 5 points and remove up to three tail squares, keeping the minimum snake length."};
+            VBox guide=new VBox(9);guide.setPadding(new Insets(0,20,14,20));
+            var types=CoinSequence.Type.values();
+            for(int i=0;i<types.length;i++) {
+                HBox row=new HBox(12,coinIcon(types[i],23),label(descriptions[i],"help-text"));row.setAlignment(Pos.CENTER_LEFT);
+                row.setAccessibleText(details[i]);Tooltip.install(row,new Tooltip(details[i]));guide.getChildren().add(row);
+            }
+            Label controls=label("1 step = move one square\nTimers stop while paused or waiting\n\nArrow keys to start and steer\nP pause · R restart · M mute","help-controls");controls.setAlignment(Pos.CENTER);
+            panel.getChildren().addAll(guide,controls);
+        } else {
+            HBox results=new HBox(58,stat(false,game.getScorePoints()),stat(true,session.best()));results.setAlignment(Pos.CENTER);
+            panel.getChildren().add(results);
+            if(state==GameSession.State.OVER&&session.newRecord())panel.getChildren().add(label("New best!","panel-subtitle"));
+            if(state==GameSession.State.OVER&&!session.savingAvailable())panel.getChildren().add(label("Best saved for this session only","panel-subtitle"));
+            Canvas illustration=SnakeRenderer.menuIllustration(session.snake());
+            Region grass=new Region();grass.getStyleClass().add("panel-grass");grass.setId("menu-grass");grass.setMinHeight(70);grass.setPrefHeight(70);
+            VBox art=new VBox(0,illustration,grass);art.setAlignment(Pos.CENTER);panel.getChildren().add(art);
+        }
+        card.getChildren().add(panel);
+        Button primary=button(help?"Back":switch(state) {case READY->"Play";case PAUSED->"Resume";case RECOVERY->"Continue";default->"Play again";},"primary-button");
+        primary.setId("primary-action");primary.setMaxWidth(Double.MAX_VALUE);
+        primary.setOnAction(event->{if(help){help=false;updateCard();return;}if(state==GameSession.State.OVER)restartAction.run();resumeAction.run();});
+        card.getChildren().add(primary);
+        if(!help) {
+            Button info=button("How to play","secondary-button");info.setMaxWidth(Double.MAX_VALUE);
+            info.setOnAction(event->{help=true;updateCard();});card.getChildren().add(info);
+        }
+    }
+    private VBox stat(boolean trophy,int value) {
+        ImageView icon=GardenAssets.icon(trophy?"trophy":"points",42);
+        VBox stat=new VBox(6,icon,label(Integer.toString(value),"result-value"));stat.setAlignment(Pos.CENTER);return stat;
+    }
+    private static Label label(String text,String style) {Label label=new Label(text);label.getStyleClass().add(style);return label;}
+    private static Button button(String text,String style) {Button button=new Button(text);button.getStyleClass().add(style);button.setFocusTraversable(false);return button;}
+
+    void render() {
+        double cell=cell();gc.setImageSmoothing(true);
+        gc.setFill(new ImagePattern(GardenAssets.image("board-tile"),0,0,2*cell,2*cell,false));gc.fillRect(0,0,gridCanvas.getWidth(),gridCanvas.getHeight());
+        Coin coin=session.coin();var p=coin.getPos();double size=cell*.83;
+        gc.drawImage(coin.getImage(),p.x*cell+(cell-size)/2,p.y*cell+(cell-size)/2,size,size);
+        Obstacle hedges=session.obstacles();
+        for(Point hedge:hedges.getObstacles())drawHedge(hedge,cell,1);
+        for(Point hedge:hedges.pendingCells()) {
+            if(hedges.getObstacles().contains(hedge))continue;
+            drawHedge(hedge,cell,.30);
+            gc.setStroke(Color.web("#fff2a0"));gc.setLineWidth(1.6);gc.setLineDashes(3,3);
+            gc.strokeRect(hedge.x*cell+2,hedge.y*cell+2,cell-4,cell-4);gc.setLineDashes();
+        }
+        for(Point gap:hedges.gateCells()) {
+            gc.setStroke(Color.web(hedges.gateWarningMoves()<0?"#e6ffff":"#ffda72"));
+            gc.setLineWidth(2);gc.setLineDashes(3,3);
+            gc.strokeRect(gap.x*cell+3,gap.y*cell+3,cell-6,cell-6);gc.setLineDashes();
+        }
+        drawSnake(session.snake());
+        if(session.effects().active(PowerUpState.Effect.WRAP)) {
+            gc.setStroke(Color.web("#53a9cf"));gc.setLineWidth(3);gc.strokeRect(1.5,1.5,gridCanvas.getWidth()-3,gridCanvas.getHeight()-3);
         }
     }
 
-    private void drawCoin(Coin coin, GraphicsContext gc) {
-        if (game.gameWon()) return;
-        double cell = game.getMultiplier() * fullScale;
-        double size = cell - 3 * fullScale;
-        var position = coin.getPos();
-        gc.drawImage(coin.getImage(), position.x * cell, position.y * cell, size, size);
+    private void drawHedge(Point p,double cell,double opacity) {
+        gc.save();gc.setGlobalAlpha(opacity);
+        gc.drawImage(GardenAssets.image("hedge"),p.x*cell,p.y*cell,cell,cell);gc.restore();
     }
 
-    private void drawGrid(Coin coin, Snake snek, GraphicsContext gc) {
-        gc.setFill(game.getColor());
-        gc.fillRect(0, 0, gridCanvas.getWidth(), gridCanvas.getHeight());
-
-        drawCoin(coin, gc);
-
-        drawSnake(snek);
-    }
-
-    /**
-     * Draws the snake using its current positions rather than turn history.
-     *
-     * @param snek the snake to draw
-     */
-    private void drawSnake(Snake snek) {
-        Point head = snek.getHead();
-        List<Point> body = SnakeSpriteSelector.drawingBody(
-                snek.getBody(), head, snek.getDead());
-
-        double cell = game.getMultiplier() * fullScale;
-        List<javafx.geometry.Point2D> path = bodyPath(body, head, previousBody,
-                previousHead, game.getWidth(), game.getHeight(), progress);
-        drawConnectedBody(path, cell, snek);
-        var tip = path.get(path.size() - 1);
-        paintWrapped(snek.getImageViewHead(), snek.getSnakeDir(), tip.getX(), tip.getY(), cell);
-    }
-
-    private void drawConnectedBody(List<javafx.geometry.Point2D> path, double cell, Snake snake) {
-        gc.save();
-        gc.scale(cell, cell);
-        gc.setImageSmoothing(false);
-        gc.setFill(javafx.scene.paint.Color.GREEN);
-        SnakeBodyPainter.paint(new SnakeBodyPainter.Surface() {
-            public void joint(double x, double y, double radius) {
-                gc.fillOval(x - radius, y - radius, 2 * radius, 2 * radius);
-            }
-
-            public void strip(double x, double y, double angle, double length, double offset, boolean tail) {
-                var image = (tail ? snake.getImageViewTail() : snake.getImageViewBody()).getImage();
-                // The final 5% of the original tail bitmap is transparent padding.
-                double h = image.getHeight() * (tail ? .95 : 1);
-                gc.save();
-                gc.translate(x, y);
-                gc.rotate(angle);
-                gc.drawImage(image, 0, Math.max(0, 1 - offset - length) * h, image.getWidth(), length * h,
-                        -.5, -length, 1, length);
-                gc.restore();
-            }
-        }, path, game.getWidth(), game.getHeight());
-        gc.restore();
-    }
-
-    private void paintWrapped(ImageView image, int rotation, double x, double y, double cell) {
-        paintSprite(image, rotation, x, y, cell);
-        if (x < 0) paintSprite(image, rotation, x + game.getWidth(), y, cell);
-        if (x > game.getWidth() - 1) paintSprite(image, rotation, x - game.getWidth(), y, cell);
-        if (y < 0) paintSprite(image, rotation, x, y + game.getHeight(), cell);
-        if (y > game.getHeight() - 1) paintSprite(image, rotation, x, y - game.getHeight(), cell);
+    /** Draws the gameplay snake through the same renderer used by the menu illustration. */
+    private void drawSnake(Snake snake) {
+        Point head=snake.getHead();
+        List<Point> body=SnakeSpriteSelector.drawingBody(snake.getBody(),head,snake.getDead());
+        List<javafx.geometry.Point2D> path=bodyPath(body,head,previousBody,previousHead,
+                game.getWidth(),game.getHeight(),progress);
+        renderedHead=path.get(path.size()-1);
+        SnakeRenderer.paint(gc,snake,path,game.getWidth(),game.getHeight(),cell());
     }
 
     /** Keeps occupied bends fixed while the two endpoints advance along grid edges. */
@@ -215,52 +296,4 @@ public class GameView {
         return from + delta * progress;
     }
 
-
-
-    public void gameWon() {
-        if (game.gameWon() && !gameWonVis) {
-            gameWonVis = true;
-            gameWonLabel.setVisible(true);
-        } else if (!game.gameWon() && gameWonVis) {
-            gameWonVis = false;
-            gameWonLabel.setVisible(false);
-        }
-    }
-
-    /**
-     * Updates the game-over message according to the snake's state.
-     *
-     * @param snek the snake whose state determines message visibility
-     */
-    public void gameOver(Snake snek) {
-        if (snek.getDead() && !gameOverVis) {
-            gameOverVis = true;
-            gameOverLabel.setVisible(true);
-        } else if (!snek.getDead() && gameOverVis) {
-            gameOverLabel.setVisible(false);
-            gameOverVis = false;
-        }
-    }
-
-    void showRecovery() {
-        gameOverLabel.setText("Life lost — press an arrow");
-        gameOverLabel.setVisible(true);
-    }
-
-    void hideRecovery() {
-        gameOverLabel.setText("GAME OVER");
-        gameOverLabel.setVisible(false);
-    }
-
-    public void updateScoreLabel() {
-        String next = switch (game.level()) {
-            case 1 -> "/40";
-            case 2 -> "/80";
-            default -> "";
-        };
-        scoreLabel.setText("Lv " + game.level() + "  Score " + game.getScorePoints()
-                + next + "  Lives " + game.hearts());
-    }
-
 }
-

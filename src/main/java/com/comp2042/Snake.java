@@ -48,9 +48,12 @@ public class Snake {
      * @throws IllegalArgumentException if a living snake receives an invalid direction
      */
     public boolean move(char dir, Point coinPosition) {
-        if (dead) {
-            return false;
-        }
+        return move(dir, coinPosition, true);
+    }
+
+    /** Moves with optional pickup growth, allowing shrink pickups to keep the tail moving. */
+    boolean move(char dir, Point coinPosition, boolean growOnPickup) {
+        if (dead) return false;
 
         Point next = new Point(head);
         int nextDirection;
@@ -71,7 +74,8 @@ public class Snake {
             next.setLocation(Math.floorMod(next.x, gx), Math.floorMod(next.y, gy));
         }
 
-        boolean grows = next.equals(coinPosition);
+        boolean collected = next.equals(coinPosition);
+        boolean grows = collected && growOnPickup;
         // The tail cell is available only if this move will remove the tail.
         int firstOccupied = grows ? 0 : 1;
         boolean hitsBody = false;
@@ -92,25 +96,41 @@ public class Snake {
         }
         head.setLocation(next);
         snakeDir = nextDirection;
-        return grows;
+        return collected;
     }
 
-    /** Place a fresh snake with a clear first step and preserve the current coin. */
-    void findRespawn(Point coin) {
-        for (int offset = 0; offset < gy; offset++) {
-            int row = (gy / 2 + offset) % gy;
-            for (int column = 1; column < gx - 1; column++) {
-                Point left = new Point(column - 1, row);
-                Point center = new Point(column, row);
-                Point right = new Point(column + 1, row);
-                var cells = java.util.List.of(left, center, right);
-                if (cells.contains(coin) || !java.util.Collections.disjoint(cells, obstacle.getObstacles())) continue;
-                head.setLocation(center);
-                body.get(0).setLocation(right);
-                return;
-            }
+    /** Places a fresh left-facing snake on the nearest clear lane to the board centre. */
+    void findRespawn(Point coin) { findRespawn(coin, 'L'); }
+
+    /** Orients a fresh two-cell snake so any arrow can resume on a safe first step. */
+    void findRespawn(Point coin, char direction) {
+        int dx = switch (direction) { case 'L' -> -1; case 'R' -> 1; case 'U', 'D' -> 0;
+            default -> throw new IllegalArgumentException("Unknown direction: " + direction); };
+        int dy = direction == 'U' ? -1 : direction == 'D' ? 1 : 0;
+        var candidates = new ArrayList<Point>();
+        for (int row = 0; row < gy; row++) for (int column = 0; column < gx; column++) candidates.add(new Point(column, row));
+        Point centre = new Point(gx / 2, gy / 2);
+        candidates.sort(java.util.Comparator.comparingInt(p -> Math.abs(p.x-centre.x)+Math.abs(p.y-centre.y)));
+        for (Point candidate : candidates) {
+            Point behind = new Point(candidate.x-dx, candidate.y-dy);
+            Point ahead = new Point(candidate.x+dx, candidate.y+dy);
+            var cells = java.util.List.of(behind, candidate, ahead);
+            if (cells.stream().anyMatch(p -> p.x < 0 || p.y < 0 || p.x >= gx || p.y >= gy)) continue;
+            if (cells.contains(coin) || !java.util.Collections.disjoint(cells, obstacle.getObstacles())) continue;
+            head.setLocation(candidate);
+            body.clear(); body.add(behind);
+            snakeDir = switch (direction) { case 'U' -> 0; case 'R' -> 90; case 'D' -> 180; default -> 270; };
+            return;
         }
         throw new IllegalStateException("No safe respawn lane");
+    }
+
+    /** Removes tail segments while keeping at least a head and one body cell. */
+    public int shrink(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("Shrink amount must not be negative");
+        int removed = Math.min(amount, Math.max(0, body.size() - 1));
+        body.subList(0, removed).clear();
+        return removed;
     }
 
     public int getBodyDir(int bodyCount) {
@@ -124,7 +144,7 @@ public class Snake {
     }
 
     public ArrayList<Point> getBody() {
-        return new ArrayList<>(body);
+        return body.stream().map(Point::new).collect(java.util.stream.Collectors.toCollection(ArrayList::new));
     }
 
     public Point getHead() {

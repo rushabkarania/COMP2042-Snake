@@ -6,7 +6,7 @@ import java.util.List;
 
 /** Chooses coin types for one round when power-ups are enabled. */
 final class CoinSequence {
-    enum Type { RED, GOLD, BLUE, RAINBOW, SILVER }
+    enum Type { RED, GOLD, BLUE, RAINBOW, SILVER, SHRINK }
 
     private final List<Type> remaining = new ArrayList<>();
 
@@ -15,7 +15,7 @@ final class CoinSequence {
         if (remaining.isEmpty()) {
             remaining.add(Type.SILVER);
             List<Type> others = new ArrayList<>(List.of(Type.RED, Type.RED, Type.RED,
-                    Type.RED, Type.GOLD, Type.BLUE, Type.RAINBOW));
+                    Type.SHRINK, Type.GOLD, Type.BLUE, Type.RAINBOW));
             Collections.shuffle(others);
             remaining.addAll(others);
         }

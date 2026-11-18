@@ -5,264 +5,192 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 import java.util.ArrayDeque;
+import java.util.function.LongSupplier;
 
-
-
+/** Connects keyboard/buttons and the animation clock to a testable game session. */
 public class GameController {
-    private Snake snek;
-    private Coin coin;
-    private GameView gameView;
-    private Game game;
-    private Stage stage;
-    private final CoinSequence coinSequence = new CoinSequence();
-    private final CoinSound coinSound = new CoinSound();
-    private Obstacle obstacle;
-
-    private KeyCode key = KeyCode.LEFT;
+    private final GameSession session;
+    private final GameView view;
+    private final Stage stage;
+    private final Runnable onMenu;
     private final TurnBuffer turns = new TurnBuffer();
-    private boolean running;
+    private final CoinSound sound = new CoinSound();
+    private KeyCode key = KeyCode.LEFT;
     private long lastStep;
-    private double speed;
+    private boolean muted;
+    private final LongSupplier nanoTime;
 
     static final class TurnBuffer {
         private final ArrayDeque<KeyCode> queue = new ArrayDeque<>(2);
-
         void offer(KeyCode current, KeyCode requested) {
             KeyCode previous = queue.isEmpty() ? current : queue.getLast();
-            if (queue.size() < 2 && requested != previous && isDirectionAllowed(previous, requested)) {
-                queue.addLast(requested);
-            }
+            if (queue.size() < 2 && requested != previous && isDirectionAllowed(previous, requested)) queue.addLast(requested);
         }
-
-        KeyCode take(KeyCode current) {
-            return queue.isEmpty() ? current : queue.removeFirst();
-        }
-
-        void clear() {
-            queue.clear();
-        }
+        KeyCode take(KeyCode current) { return queue.isEmpty() ? current : queue.removeFirst(); }
+        void clear() { queue.clear(); }
     }
 
-    private int legacyScoreMultiplier = 2;
-
-    private void calculateBonusScore() {
-        int bonus = game.getScorePoints() * legacyScoreMultiplier;
-        System.out.println("Bonus score: " + bonus);
+    public GameController(GameSession session, GameView view, Stage stage, Runnable onMenu) {
+        this(session, view, stage, onMenu, System::nanoTime);
     }
 
-    public GameController(Snake snek, Coin coin, Game game, GameView gameView, Obstacle obstacle, Stage stage) {
-        this.snek = snek;
-        this.coin = coin;
-        this.gameView = gameView;
-        this.game = game;
+    GameController(GameSession session, GameView view, Stage stage, Runnable onMenu, LongSupplier nanoTime) {
+        this.nanoTime = nanoTime;
+        this.session = session;
+        this.view = view;
         this.stage = stage;
-
-        this.obstacle = obstacle;
-        stage.setOnHidden(event -> stopMovement());
-        
-        speed = game.getSpeed();
+        this.onMenu = onMenu;
+        view.bindActions(this::play, this::togglePause, this::reset,
+                stage::close, this::toggleMute, () -> stage.setFullScreen(!stage.isFullScreen()));
+        stage.setOnHidden(event -> { stopClock(); session.save(); });
+        stage.setOnCloseRequest(event -> returnToMenu());
+        stage.focusedProperty().addListener((property, before, focused) -> {
+            if (!focused && session.state() == GameSession.State.RUNNING) pause();
+        });
     }
 
     private final AnimationTimer animation = new AnimationTimer() {
-        @Override
-        public void handle(long now) {
-            long interval = (long) (1_000_000_000 / speed);
-            if (lastStep == 0 || now - lastStep >= interval) {
-                lastStep = stepStart(lastStep, now, interval);
-                gameView.beginStep(snek);
-                advanceRound();
-            }
-            gameView.setProgress(running ? Math.min(1.0, (now - lastStep) * speed / 1_000_000_000) : 1);
-            gameView.drawGrid(coin, snek, obstacle, gameView.gc, false, 0);
-        }
+        @Override public void handle(long now) { pulse(now); }
     };
 
-    /** Preserve the fractional step time on a late pulse; resume a stalled window without a jump. */
-    static long stepStart(long previous, long now, long interval) {
-        if (previous == 0 || now - previous >= 2 * interval) return now;
-        return previous + interval;
+    /** Uses one clock for the real animation pulse and deterministic input-timing checks. */
+    void pulse(long now) {
+        if (session.state() != GameSession.State.RUNNING) { stopClock(); return; }
+        long interval = (long) (1_000_000_000 / session.speed());
+        if (now - lastStep >= interval) {
+            lastStep = stepStart(lastStep, now, interval);
+            advanceOneStep();
+        }
+        view.setProgress(session.state() == GameSession.State.RUNNING
+                ? Math.max(0, Math.min(1, (now - lastStep) * session.speed() / 1_000_000_000)) : 1);
+        view.render();
     }
 
-    private void stopMovement() {
+    private void advanceOneStep() {
+        view.beginStep(session.snake());
+        key = turns.take(key);
+        boolean collected = session.step(direction(key));
+        if (collected && !muted) sound.play();
+        if (session.state() != GameSession.State.RUNNING) {
+            stopClock();
+            key = KeyCode.LEFT;
+            view.beginStep(session.snake());
+        }
+        view.updateHud();
+    }
+
+    /** Preserves the fractional step remainder, discarding long stalls to avoid teleportation. */
+    static long stepStart(long previous, long now, long interval) {
+        return previous == 0 || now - previous >= 2 * interval ? now : previous + interval;
+    }
+
+    private static char direction(KeyCode code) {
+        return switch (code) {
+            case UP -> 'U'; case RIGHT -> 'R'; case DOWN -> 'D'; case LEFT -> 'L';
+            default -> throw new IllegalArgumentException("Not a movement key: " + code);
+        };
+    }
+
+    private void stopClock() {
         animation.stop();
-        running = false;
         turns.clear();
         lastStep = 0;
-        gameView.setProgress(1);
+        view.setProgress(1);
     }
 
-    private boolean roundFinished() {
-        return snek.getDead() || game.gameWon();
+    /** Starts in the key handler instead of waiting for the next timer tick. */
+    private void startOrResume() {
+        if (session.state() == GameSession.State.OVER) return;
+        if (session.state() != GameSession.State.RUNNING) {
+            session.resume(direction(key));
+            if (session.state() != GameSession.State.RUNNING) return;
+            lastStep = nanoTime.getAsLong();
+            view.setProgress(0);
+            advanceOneStep();
+            if (session.state() == GameSession.State.RUNNING) animation.start();
+            view.render();
+        }
+        if (!view.root().isFocused()) view.root().requestFocus();
     }
 
-    private void advanceRound() {
-        key = turns.take(key);
-        char direction = switch (key) {
-            case LEFT -> 'L';
-            case RIGHT -> 'R';
-            case UP -> 'U';
-            case DOWN -> 'D';
-            default -> throw new IllegalStateException("Invalid movement key: " + key);
-        };
-        boolean collectedCoin = snek.move(direction, coin.getPos());
-
-        if (snek.getDead()) {
-            stopMovement();
-            if (game.loseHeart()) {
-                snek = new Snake(game.getWidth(), game.getHeight(), game.isNoBorder(), obstacle);
-                snek.findRespawn(coin.getPos());
-                gameView.beginStep(snek);
-                key = KeyCode.LEFT;
-                speed = game.getSpeed() + game.level() - 1;
-                gameView.showRecovery();
-            }
-        } else if (game.level() == 3) {
-            obstacle.advancePatrol(snek, coin.getPos());
-        }
-
-        if (collectedCoin) {
-            coinSound.play();
-            int previousLevel = game.level();
-            powerCoin();
-            if (previousLevel < 2 && game.level() >= 2) {
-                game.decMaxScore(obstacle.placeObstacles(snek, coin.getPos(), 4));
-            }
-            if (previousLevel < 3 && game.level() == 3) obstacle.startPatrol();
-            speed += game.level() - 1;
-            game.incScore();
-            if (!game.gameWon()) {
-                newCoin();
-            }
-        }
-
-
-        gameView.gameWon();
-        gameView.gameOver(snek);
-        gameView.updateScoreLabel();
-        if (roundFinished()) {
-            stopMovement();
-        }
+    /** Play reveals the board; a fresh or recovered snake starts only on an arrow key. */
+    private void play() {
+        if (session.state() == GameSession.State.PAUSED) startOrResume();
+        else if (session.state() == GameSession.State.READY) view.waitForArrow();
+        view.root().requestFocus();
     }
 
-    public void handle(KeyEvent event) {
-
-        if (event.getCode().isArrowKey() && !roundFinished()) {
-            if (!isDirectionAllowed(key, event.getCode()) && !running) return;
-            gameView.hideRecovery();
-            turns.offer(key, event.getCode());
-            if (!running) {
-                running = true;
-                animation.start();
-            }
-        }
-
-        if (event.getCode().equals(KeyCode.P)) {
-            stopMovement();
-        }
-
-        if (event.getCode().equals(KeyCode.TAB)) {
-            reset();
-        }
-
-        if (event.getCode() == KeyCode.PLUS
-                || event.getCode() == KeyCode.ADD
-                || event.getCode() == KeyCode.EQUALS) {
-            gameView.scaleToFullscreen(true, stage, obstacle, snek, coin);
-            gameView.gameOverLabel.setStyle("-fx-font-size: 50;");
-            gameView.gameWonLabel.setStyle("-fx-font-size: 50;");
-            gameView.scoreLabel.setStyle("-fx-font-size: 35;");
-        }
-
-        if (event.getCode() == KeyCode.MINUS
-                || event.getCode() == KeyCode.SUBTRACT) {
-            gameView.scaleToFullscreen(false, stage, obstacle, snek, coin);
-            gameView.gameOverLabel.setStyle("-fx-font-size: 15;");
-            gameView.gameWonLabel.setStyle("-fx-font-size: 15;");
-            gameView.scoreLabel.setStyle("-fx-font-size: 15;");
-        }
-
-        if (event.getCode().equals(KeyCode.ESCAPE)) {
-            MainMenuController mainMenuController = new MainMenuController();
-            mainMenuController.getViewManager().getPrimaryStage().show();
-            mainMenuController.getViewManager().getGameStage().close();
-        }
+    private void pause() {
+        session.pause();
+        stopClock();
+        view.refresh();
     }
 
-        /**
-         * Checks whether a requested direction is accepted.
-         *
-         * @param currentDirection the current movement direction
-         * @param requestedDirection the requested keyboard direction
-         * @return true if the direction is accepted; otherwise false
-         */
-        static boolean isDirectionAllowed(
-                KeyCode currentDirection,
-                KeyCode requestedDirection) {
+    private void togglePause() {
+        if (session.state() == GameSession.State.RUNNING) pause();
+        else if (session.state() == GameSession.State.PAUSED) startOrResume();
+        view.root().requestFocus();
+    }
 
-            if (!requestedDirection.isArrowKey()) {
-                return false;
-            }
-
-            return switch (requestedDirection) {
-                case LEFT -> currentDirection != KeyCode.RIGHT;
-                case RIGHT -> currentDirection != KeyCode.LEFT;
-                case DOWN -> currentDirection != KeyCode.UP;
-                case UP -> currentDirection != KeyCode.DOWN;
-                default -> false;
-            };
-        }
-
+    private void toggleMute() {
+        muted = !muted;
+        view.setMuted(muted);
+        view.root().requestFocus();
+    }
 
     private void reset() {
-
-        stopMovement();
-
-        gameView.hideRecovery();
-        obstacle.reset();
-        coinSequence.reset();
-        game.resetScore();
-        snek = new Snake(game.getWidth(), game.getHeight(), game.isNoBorder(), obstacle);
-        coin = new Coin(game.getWidth(), game.getHeight(), snek, obstacle);
-
-        speed = game.getSpeed();
+        stopClock();
+        session.reset();
         key = KeyCode.LEFT;
-
-        gameView.gameWon();
-        gameView.gameOver(snek);
-        gameView.updateScoreLabel();
-
-        gameView.drawGrid(coin, snek, obstacle, gameView.gc, false, 0);
+        view.beginStep(session.snake());
+        view.showStartScreen();
+        view.refresh();
+        view.root().requestFocus();
     }
 
-    private void powerCoin() {
-        speed = game.getSpeed();
-        snek.ignoreBorders(false);
-        if (coin.getClass().equals(RainbowCoin.class)) {
-            RainbowCoin tempCoin = (RainbowCoin) coin;
-            speed = game.getSpeed() + tempCoin.getSpeedBonus();
-        } else if (coin.getClass().equals(SilverCoin.class)){
-            if (game.level() == 2) {
-                game.decMaxScore(obstacle.newObstacles(snek, coin, 4));
-            } else if (game.level() == 3) {
-                obstacle.freezePatrol();
+    void showStart() { reset(); }
+    private void returnToMenu() { stopClock(); session.save(); onMenu.run(); }
+
+    /** Dispatches shortcuts at scene level so buttons never steal movement keys. */
+    public void handle(KeyEvent event) {
+        KeyCode code = event.getCode();
+        if (code.isArrowKey()) {
+            var state = session.state();
+            if (state == GameSession.State.READY || state == GameSession.State.RECOVERY) {
+                turns.clear();
+                key = code;
+                startOrResume();
+            } else if (state == GameSession.State.RUNNING || state == GameSession.State.PAUSED) {
+                if (state == GameSession.State.PAUSED && !isDirectionAllowed(key, code)) { event.consume(); return; }
+                turns.offer(key, code);
+                if (state == GameSession.State.PAUSED) startOrResume();
             }
-        } else if (coin.getClass().equals(BlueCoin.class)) {
-            snek.ignoreBorders(true);
+        } else switch (code) {
+            case P, SPACE -> togglePause();
+            case ENTER -> {
+                if (session.state() == GameSession.State.OVER) reset();
+                else if (session.state() != GameSession.State.RECOVERY) play();
+            }
+            case TAB, R -> reset();
+            case M -> toggleMute();
+            case F, F11 -> stage.setFullScreen(!stage.isFullScreen());
+            case PLUS, ADD, EQUALS -> stage.setFullScreen(true);
+            case MINUS, SUBTRACT -> stage.setFullScreen(false);
+            case ESCAPE -> { if (stage.isFullScreen()) stage.setFullScreen(false); else returnToMenu(); }
+            default -> { return; }
         }
-        game.addPoints(coin.getPoints());
+        event.consume();
     }
 
-    private void newCoin() {
-        int width = game.getWidth();
-        int height = game.getHeight();
-        CoinSequence.Type type = game.isPowerUp() ? coinSequence.next() : CoinSequence.Type.RED;
-        coin = switch (type) {
-            case RED -> new Coin(width, height, snek, obstacle);
-            case GOLD -> new GoldCoin(width, height, snek, obstacle);
-            case BLUE -> new BlueCoin(width, height, snek, obstacle);
-            case RAINBOW -> new RainbowCoin(width, height, snek, obstacle);
-            case SILVER -> new SilverCoin(width, height, snek, obstacle);
+    /** Rejects direct reversals and keys that are not movement directions. */
+    static boolean isDirectionAllowed(KeyCode currentDirection, KeyCode requestedDirection) {
+        if (!requestedDirection.isArrowKey()) return false;
+        return switch (requestedDirection) {
+            case LEFT -> currentDirection != KeyCode.RIGHT;
+            case RIGHT -> currentDirection != KeyCode.LEFT;
+            case DOWN -> currentDirection != KeyCode.UP;
+            case UP -> currentDirection != KeyCode.DOWN;
+            default -> false;
         };
     }
 }
-
