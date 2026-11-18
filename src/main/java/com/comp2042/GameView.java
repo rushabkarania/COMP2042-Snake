@@ -42,8 +42,17 @@ public class GameView {
     private Point previousHead=new Point();
     private double progress=1;
     private javafx.geometry.Point2D renderedHead;
+    /**
+     * Returns the head position from the latest rendered path for visual checks.
+     * @return last rendered head in cell coordinates
+     */
     javafx.geometry.Point2D renderedHead() { return renderedHead; }
 
+    /**
+     * Builds the resizable board, HUD and start/help overlays for a session.
+     *
+     * @param session session whose state is displayed
+     */
     public GameView(GameSession session) {
         this.session=session; game=session.game();
         root.getStyleClass().add("game-root"); root.setId("game-root"); root.setFocusTraversable(true);
@@ -73,8 +82,19 @@ public class GameView {
         beginStep(session.snake()); refresh();
     }
 
+    /**
+     * Exposes the top-level view for attachment to a scene.
+     *
+     * @return root layout node
+     */
     public BorderPane root() { return root; }
+    /**
+     * Hides the start card and shows the arrow prompt without starting movement.
+     */
     void waitForArrow() { waitingForArrow=true;help=false;updateCard(); }
+    /**
+     * Restores the start card and closes help.
+     */
     void showStartScreen() { waitingForArrow=false;help=false;updateCard(); }
 
     private void makeDirectionPrompt() {
@@ -90,15 +110,40 @@ public class GameView {
         Label message=label("Press an arrow key","direction-message");message.setId("direction-message");
         directionPrompt.getChildren().addAll(keys,message);
     }
+    /**
+     * Snapshots positions before a logical move for rendering interpolation.
+     *
+     * @param snake snake whose current positions are copied
+     */
     void beginStep(Snake snake) { previousHead=snake.getHead(); previousBody=List.copyOf(snake.getBody()); }
+    /**
+     * Sets the movement interpolation fraction.
+     *
+     * @param fraction progress from 0 at the previous positions to 1 at the current positions
+     */
     void setProgress(double fraction) { progress=fraction; }
     private double cell() { return gridCanvas.getWidth()/game.getWidth(); }
 
+    /**
+     * Binds view controls to controller callbacks.
+     *
+     * @param resume play or resume callback
+     * @param togglePause pause/resume toggle callback
+     * @param restart new-run callback
+     * @param menu close-button callback supplied by the controller
+     * @param toggleMute sound toggle callback
+     * @param fullscreen fullscreen toggle callback
+     */
     void bindActions(Runnable resume,Runnable togglePause,Runnable restart,Runnable menu,Runnable toggleMute,Runnable fullscreen) {
         resumeAction=resume; restartAction=restart;
         pause.setOnAction(event->togglePause.run()); mute.setOnAction(event->toggleMute.run());
         full.setOnAction(event->fullscreen.run()); close.setOnAction(event->menu.run());
     }
+    /**
+     * Updates the sound icon, tooltip and accessibility text.
+     *
+     * @param muted whether sound is currently muted
+     */
     void setMuted(boolean muted) {
         mute.setGraphic(UiIcons.icon(muted?"muted":"sound"));
         mute.setAccessibleText(muted?"Sound off. Unmute (M)":"Sound on. Mute (M)");
@@ -141,9 +186,14 @@ public class GameView {
         card.setScaleX(scale);card.setScaleY(scale);
     }
 
+    /**
+     * Updates the HUD and repaints the board.
+     */
     void refresh() { updateHud(); render(); }
 
-    /** Updates controls once per logical movement, leaving painting to the animation pulse. */
+    /**
+     * Refreshes scores, lives, effect timers, warnings and state-dependent controls.
+     */
     void updateHud() {
         scoreLabel.setText(Integer.toString(game.getScorePoints()));bestLabel.setText(Integer.toString(session.best()));
         if(!Integer.valueOf(game.hearts()).equals(hearts.getUserData())) {
@@ -225,6 +275,9 @@ public class GameView {
     private static Label label(String text,String style) {Label label=new Label(text);label.getStyleClass().add(style);return label;}
     private static Button button(String text,String style) {Button button=new Button(text);button.getStyleClass().add(style);button.setFocusTraversable(false);return button;}
 
+    /**
+     * Repaints the board, obstacles, pickup and interpolated snake at the current canvas size.
+     */
     void render() {
         double cell=cell();gc.setImageSmoothing(true);
         gc.setFill(new ImagePattern(GardenAssets.image("board-tile"),0,0,2*cell,2*cell,false));gc.fillRect(0,0,gridCanvas.getWidth(),gridCanvas.getHeight());
@@ -264,7 +317,18 @@ public class GameView {
         SnakeRenderer.paint(gc,snake,path,game.getWidth(),game.getHeight(),cell());
     }
 
-    /** Keeps occupied bends fixed while the two endpoints advance along grid edges. */
+    /**
+     * Builds an interpolated tail-to-head path while keeping occupied bends fixed.
+     *
+     * @param body current body positions ordered tail first
+     * @param head current head cell
+     * @param oldBody previous body positions ordered tail first
+     * @param oldHead previous head cell
+     * @param width board width in cells
+     * @param height board height in cells
+     * @param fraction movement progress from 0 to 1
+     * @return new path in cell coordinates ending at the interpolated head
+     */
     static List<javafx.geometry.Point2D> bodyPath(List<Point> body, Point head,
             List<Point> oldBody, Point oldHead, int width, int height, double fraction) {
         var path = new java.util.ArrayList<javafx.geometry.Point2D>();
@@ -288,6 +352,15 @@ public class GameView {
         gc.restore();
     }
 
+    /**
+     * Interpolates a one-cell coordinate change, taking the short route across a wrapped boundary.
+     *
+     * @param from previous cell coordinate
+     * @param to current cell coordinate
+     * @param size board dimension on this axis
+     * @param progress movement progress; values at least 1 return the destination
+     * @return interpolated coordinate, which may briefly lie outside the board at a wrap
+     */
     static double interpolate(int from, int to, int size, double progress) {
         if (progress >= 1) return to;
         int delta = to - from;

@@ -10,6 +10,16 @@ import javafx.scene.paint.Color;
 
 /** Draws the original head, patterned body and tapered tail for both gameplay and menu art. */
 final class SnakeRenderer {
+    /**
+     * Draws the interpolated snake with the original sprites and wrapped head copies.
+     *
+     * @param gc canvas graphics context
+     * @param snake snake supplying sprites and head orientation
+     * @param path nonempty tail-to-head path in cell coordinates
+     * @param width board width in cells
+     * @param height board height in cells
+     * @param cell rendered cell size in pixels
+     */
     static void paint(GraphicsContext gc,Snake snake,List<Point2D> path,int width,int height,double cell) {
         paint(gc,snake,path,width,height,cell,snake.getSnakeDir(),0);
     }
@@ -38,7 +48,12 @@ final class SnakeRenderer {
         gc.save();gc.translate((x+.5)*cell,(y+.5)*cell);gc.rotate(rotation);
         gc.drawImage(image,-cell/2,-cell/2,cell,cell);gc.restore();
     }
-    /** Large side-on snake entering from off-canvas, with its body resting above the grass. */
+    /**
+     * Creates a large side-on snake illustration with visible sprite edges aligned above the grass.
+     *
+     * @param snake snake supplying the gameplay sprites
+     * @return new 280 by 112 pixel illustration canvas
+     */
     static Canvas menuIllustration(Snake snake) {
         Canvas canvas=new Canvas(280,112);canvas.setId("menu-snake-sprites");
         canvas.setAccessibleText("Gameplay snake entering from the left, facing right above the grass");

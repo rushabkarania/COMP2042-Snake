@@ -8,7 +8,15 @@ import javafx.stage.Stage;
 public class ViewManager {
     private final Stage stage;
     private GameController controller;
+    /**
+     * Creates a manager for the shared application window.
+     *
+     * @param stage stage used for both menu and gameplay
+     */
     public ViewManager(Stage stage) { this.stage=stage; }
+    /**
+     * Builds a normal-difficulty session, binds input and styling, and shows the start panel.
+     */
     public void initializeMainMenu() {
         GameSession session=new GameSession(new Game(20,20,true,'N'));
         GameView view=new GameView(session);
@@ -21,7 +29,20 @@ public class ViewManager {
         stage.setFullScreenExitHint("");stage.setFullScreenExitKeyCombination(javafx.scene.input.KeyCombination.NO_MATCH);
         stage.show();view.root().requestFocus();
     }
+    /**
+     * Returns the shared application window.
+     *
+     * @return primary stage
+     */
     public Stage getPrimaryStage() { return stage; }
+    /**
+     * Returns the window used for gameplay.
+     *
+     * @return the same stage as getPrimaryStage()
+     */
     public Stage getGameStage() { return stage; }
+    /**
+     * Resets the current controller and shows its start screen; requires initialization first.
+     */
     public void showMainMenu() { controller.showStart(); }
 }

@@ -12,7 +12,11 @@ public final class HighScoreStore {
     private int best;
     private boolean available = true;
 
-    /** Loads a record from a file, treating corrupt content as an empty record. */
+    /**
+     * Loads a record; malformed or negative content becomes zero and access failures disable availability.
+     *
+     * @param file record file path, resolved to an absolute path
+     */
     public HighScoreStore(Path file) {
         this.file = file.toAbsolutePath();
         try {
@@ -24,17 +28,36 @@ public final class HighScoreStore {
         }
     }
 
-    /** Uses the user's application data folder, overridable for portable runs and tests. */
+    /**
+     * Opens best.txt in snake.data.dir, defaulting to .comp2042-snake under the user home.
+     *
+     * @param game reserved game context; currently unused because runs share one record
+     * @return record store for the configured directory
+     */
     public static HighScoreStore forGame(Game game) {
         String directory = System.getProperty("snake.data.dir",
                 Path.of(System.getProperty("user.home"), ".comp2042-snake").toString());
         return new HighScoreStore(Path.of(directory, "best.txt"));
     }
 
+    /**
+     * Returns the best score retained in memory.
+     *
+     * @return nonnegative personal best
+     */
     public int best() { return best; }
+    /**
+     * Reports whether loading or the latest attempted write succeeded.
+     *
+     * @return false after an I/O or security failure
+     */
     public boolean available() { return available; }
 
-    /** Keeps a higher record in memory and atomically replaces the saved file where supported. */
+    /**
+     * Retains a higher score and saves it, using atomic replacement where supported; retries unavailable storage.
+     *
+     * @param score candidate score; values below the existing best do not reduce it
+     */
     public void record(int score) {
         if (score <= best && available) return;
         best = Math.max(best, score);

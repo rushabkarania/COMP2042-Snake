@@ -6,11 +6,28 @@ import java.util.List;
 
 /** Chooses coin types for one round when power-ups are enabled. */
 final class CoinSequence {
-    enum Type { RED, GOLD, BLUE, RAINBOW, SILVER, SHRINK }
+    /** Creates an empty sequence ready to generate its first group. */
+    CoinSequence() { }
+
+    /**
+     * Collectible types used by the shuffled sequence.
+     */
+    enum Type {
+        /** Ordinary score pickup. */ RED,
+        /** Bonus-score pickup. */ GOLD,
+        /** Border-wrap pickup. */ BLUE,
+        /** Rush pickup. */ RAINBOW,
+        /** Hedge-gate pickup. */ SILVER,
+        /** Tail-shortening pickup. */ SHRINK
+    }
 
     private final List<Type> remaining = new ArrayList<>();
 
-    /** Returns the next type. Each group of eight ends with a silver coin. */
+    /**
+     * Returns the next type from shuffled eight-pickup groups, each ending with silver.
+     *
+     * @return next collectible type
+     */
     Type next() {
         if (remaining.isEmpty()) {
             remaining.add(Type.SILVER);

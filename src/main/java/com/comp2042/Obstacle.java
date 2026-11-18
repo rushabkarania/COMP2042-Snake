@@ -6,24 +6,76 @@ import javafx.scene.paint.Color;
 
 /** Warned, stationary hedge layouts with safe replacement and temporary two-cell gates. */
 public class Obstacle {
+    /**
+     * Successful moves shown before a proposed layout may be installed.
+     */
     static final int LAYOUT_WARNING_MOVES=12;
+    /**
+     * Successful moves shown before a temporary gate may close.
+     */
     static final int GATE_WARNING_MOVES=8;
     private final int width,height;
     private final ArrayList<Point> obstacles=new ArrayList<>();
     private List<Point> fullLayout=List.of(),pending=List.of(),gate=List.of();
     private int warningMoves,gateWarning=-1,requestedRevision=-1,completedRevision=-1,retryMoves;
 
+    /**
+     * Creates an empty obstacle board.
+     *
+     * @param width board width in cells
+     * @param height board height in cells
+     */
     public Obstacle(int width,int height) { this.width=width;this.height=height; }
+    /**
+     * Returns the hedge rendering colour.
+     *
+     * @return dark green hedge colour
+     */
     public Color getColor() { return Color.web("#28713d"); }
-    /** Live collision cells, excluding the temporarily opened gate. */
+    /**
+     * Exposes live collision cells, excluding an open gate; callers can mutate this list.
+     *
+     * @return live mutable obstacle list
+     */
     public ArrayList<Point> getObstacles() { return obstacles; }
+    /**
+     * Copies the cells of a proposed layout.
+     *
+     * @return unmodifiable list of copied positions
+     */
     public List<Point> pendingCells() { return pending.stream().map(Point::new).toList(); }
+    /**
+     * Copies the cells removed for a temporary gate.
+     *
+     * @return unmodifiable list of copied gate positions
+     */
     public List<Point> gateCells() { return gate.stream().map(Point::new).toList(); }
+    /**
+     * Returns the layout preview countdown.
+     *
+     * @return successful moves remaining before a safety-checked transition
+     */
     public int warningMoves() { return warningMoves; }
+    /**
+     * Returns the gate closing countdown.
+     *
+     * @return remaining moves, or -1 when no closing countdown is active
+     */
     public int gateWarningMoves() { return gateWarning; }
+    /**
+     * Checks whether a layout is waiting to be installed.
+     *
+     * @return true when a proposal exists
+     */
     public boolean hasPendingLayout() { return !pending.isEmpty(); }
 
-    /** Requests a new pattern at 40/80 points and each additional 80 points. */
+    /**
+     * Requests a new pattern at 40 and 80 points, then every additional 80 points.
+     *
+     * @param score current score
+     * @param snake snake whose occupied cells must remain clear
+     * @param coin current pickup cell
+     */
     void requestLayout(int score,Snake snake,Point coin) {
         int revision=HedgeLayouts.revision(score);
         if(revision<0)return;
@@ -35,7 +87,13 @@ public class Obstacle {
         requestedRevision=revision;pending=proposal;warningMoves=LAYOUT_WARNING_MOVES;retryMoves=0;
     }
 
-    /** Called only after a successful movement; paused/recovery states cannot consume warnings. */
+    /**
+     * Advances warnings after a successful movement and applies only safe layout or gate transitions.
+     *
+     * @param snake snake to preserve during transitions
+     * @param coin current pickup cell
+     * @param gapMoves remaining GAP effect movement steps
+     */
     void advance(Snake snake,Point coin,int gapMoves) {
         if(retryMoves>0)retryMoves--;
         if(!pending.isEmpty()) {
@@ -56,7 +114,11 @@ public class Obstacle {
         }
     }
 
-    /** Installs a scripted or validated pattern and discards a gate from the previous layout. */
+    /**
+     * Installs a caller-validated or scripted layout and clears the previous gate.
+     *
+     * @param cells new collision cells; copied and deduplicated
+     */
     void installLayout(Collection<Point> cells) {
         fullLayout=cells.stream().map(Point::new).distinct().toList();
         obstacles.clear();fullLayout.forEach(p->obstacles.add(new Point(p)));
@@ -81,12 +143,20 @@ public class Obstacle {
         if(chosen!=null) { gate=chosen;obstacles.removeAll(gate); }
     }
 
+    /**
+     * Combines layout and gate countdown messages for the HUD.
+     *
+     * @return warning text, or an empty string when no warning applies
+     */
     public String warningText() {
         var messages=new ArrayList<String>();
         if(!pending.isEmpty())messages.add(warningMoves>0?"Hedges change in "+warningMoves+" steps":"Hedges waiting for clear space");
         if(!gate.isEmpty()&&gateWarning>=0)messages.add(gateWarning>0?"Gap closes in "+gateWarning+" steps":"Gap waiting for clear space");
         return String.join(" · ",messages);
     }
+    /**
+     * Clears all obstacles, pending layouts, gates and warning timers.
+     */
     public void reset() {
         obstacles.clear();fullLayout=List.of();pending=List.of();gate=List.of();
         warningMoves=0;gateWarning=-1;requestedRevision=-1;completedRevision=-1;retryMoves=0;

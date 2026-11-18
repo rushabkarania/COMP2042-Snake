@@ -53,6 +53,21 @@
     <build>
         <finalName>${project.artifactId}</finalName>
         <plugins>
+            <!-- Include package-private coursework helpers and reject documentation warnings. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.11.2</version>
+                <configuration>
+                    <show>package</show>
+                    <doclint>all</doclint>
+                    <failOnWarnings>true</failOnWarnings>
+                    <encoding>UTF-8</encoding>
+                    <docencoding>UTF-8</docencoding>
+                    <charset>UTF-8</charset>
+                </configuration>
+            </plugin>
+
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

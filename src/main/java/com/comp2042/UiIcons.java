@@ -6,6 +6,12 @@ import javafx.scene.shape.SVGPath;
 
 /** Small original vector controls; independent of installed icon fonts. */
 final class UiIcons {
+    /**
+     * Creates a white vector control icon independent of installed fonts.
+     *
+     * @param name sound, muted, fullscreen, pause or play; any other value selects close
+     * @return new group containing the vector path
+     */
     static Group icon(String name) {
         String path = switch (name) {
             case "sound" -> "M3 9H7L12 5V19L7 15H3Z M16 8Q21 12 16 16 M19 5Q26 12 19 19";

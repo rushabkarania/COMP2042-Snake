@@ -5,11 +5,44 @@ import java.util.List;
 
 /** Maps the original sprite rows onto the moving tail-to-head path in cell units. */
 final class SnakeBodyPainter {
+    /**
+     * Drawing callbacks expressed in board-cell units.
+     */
     interface Surface {
+        /**
+         * Draws the filler beneath a connected body bend.
+         *
+         * @param x centre x coordinate in cell units
+         * @param y centre y coordinate in cell units
+         * @param radius joint radius in cell units
+         */
         void joint(double x, double y, double radius);
+        /**
+         * Draws a section of the body or tail sprite along the path.
+         *
+         * @param x strip origin x in cell units
+         * @param y strip origin y in cell units
+         * @param angle clockwise rotation in degrees
+         * @param length strip length in cell units
+         * @param offset fractional offset into the current sprite cell
+         * @param tail true when this strip belongs to the first tail cell
+         */
         void strip(double x, double y, double angle, double length, double offset, boolean tail);
     }
+    /**
+     * Creates a body painter.
+     */
+    SnakeBodyPainter() {
+    }
 
+    /**
+     * Draws joints first and textured strips second, including copies across wrapped edges.
+     *
+     * @param surface drawing callback implementation
+     * @param path tail-to-head path in cell coordinates
+     * @param width board width in cells
+     * @param height board height in cells
+     */
     static void paint(Surface surface, List<Point2D> path, int width, int height) {
         // Joints sit underneath the art so they cannot erase the scale pattern.
         for (int pass = 0; pass < 2; pass++) {
