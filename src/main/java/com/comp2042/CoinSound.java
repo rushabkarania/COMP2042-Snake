@@ -7,6 +7,9 @@ import java.util.function.Function;
 
 /** Loads and reuses the short coin sound without making gameplay depend on audio. */
 final class CoinSound {
+    /**
+     * Classpath location of the bundled pickup sound.
+     */
     static final String RESOURCE = "/resources/views/res/coinSound.wav";
     private Runnable playback;
     private final Consumer<String> report;

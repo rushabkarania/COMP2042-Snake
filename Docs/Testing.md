@@ -311,3 +311,38 @@ The full JUnit suite passed locally using Java 21, ECJ and JUnit Console: 125 te
 Run the Maven suite, then check the HUD at 40 and 80 points. In level 3 collect silver and watch the patrol resume after twelve steps. Hit a wall three times, checking that each collision consumes only one life, that movement waits for input after recovery, and that Tab restores level one and three lives.
 
 Windows playtesting at level 2, score 50/80, showed the lives count truncated to an ellipsis. Level 3 showed Lives 0 at game over. Reduced the windowed HUD font size and spacing. Repeat the level 2 collision check at normal window size to confirm Lives 2 is fully visible.
+
+## Progressive Snake HUD and endless gameplay · 16 November 2026
+
+This section supersedes historical victory, pickup-duration and HUD descriptions above. The final game has one progressive run, no selectable modes, a slim icon HUD, compact blue panels and on-demand How to play.
+
+The configured JDK 25 / Maven 3.9.9 / JavaFX 25.0.1 suite passed 143 model/helper cases plus one native JavaFX scenario: **144 checks, zero failures/errors/skips with GUI testing enabled**. Coverage includes progressive speed after stage 3, shrink minimum length, independent effects, actual full-board continuation, persistence failures, and existing collision/renderer regressions.
+
+The native scenario checks direct Play, on-demand help, no mode selector, pause/start, a scripted 40-point threshold crossing, hearts, three fatal collisions, saved best, game-over actions, mute, real 1280 × 1100 fullscreen and 560 × 700 short-window layout. The level-boundary starting score and pickup are scripted fixtures.
+
+Use `./mvnw test` (Windows: `.\mvnw.cmd test`). It skips the native scenario by default. Use `./mvnw -Dsnake.ui.tests=true test` with a desktop to include it. Linux fullscreen checks need a window manager as well as an X display.
+
+Windows rendering and audible playback remain local verification tasks. Final native checks mute before pickup because the virtual display has no usable sound device; audio unit tests verify the resource/callbacks, not sound heard through speakers. See [the revision record](GardenRevision.md) for rationale and limits.
+
+### Supplied logo, neutral score icon, unobstructed recovery and input timing
+
+149 checks pass with native UI enabled (148 model/helper cases and the native scenario). Five new model cases cover a centred respawn, waiting without extra life/score loss, and all four resume directions. Native assertions verify the actual supplied logo image in the stage icons/menu, the neutral star score image, a hidden recovery overlay, arrow-only recovery, immediate key-handler movement, partial-frame rendered progress, two rapid turns on consecutive boundaries, and no extra initial clock step. Hardware/OS/display latency on Windows is not measured.
+
+## Stationary hedge layouts and shared menu sprites
+
+This section supersedes historical rock/patrol/freeze behaviour and the logo-as-menu-illustration description. The window still uses the supplied logo, while the menu now composites the original gameplay sprites through SnakeRenderer.
+
+The new obstacle cases verify a 12-move preview, safe delayed activation, connected layouts and a current route around the body, no covering the snake/pickup, two-cell silver gates, an eight-move closing warning, occupied-gap deferral, refresh/banked gates and reset. Native screenshots cover preview, solid hedges, the open gap and the combined-sprite menu. Prior input/recovery/persistence/rendering checks remain. See Validation.md for the final build results and GardenRevision.md for the mechanism.
+
+### Menu pose/layout follow-up
+
+The combined-sprite snake is enlarged, enters from outside the left edge and faces right directly above the checkerboard. The score/best remain above it and the card is clipped to rounded corners. Native checks verify there is no layout gap between the illustration and grass, including the existing short-window checks. Gameplay rendering/rules remain unchanged.
+
+## Windows validation - 18 November 2026
+
+- Commit tested: 42dd918.
+- Command: `.\mvnw.cmd clean test`
+- Result: BUILD SUCCESS.
+- Tests reported: 158; passed: 157; skipped: 1; failures: 0; errors: 0.
+- The optional GardenUiTest was skipped because native UI testing was not enabled.
+- This run verifies the automated tests that executed; it does not establish a native UI test pass on Windows.

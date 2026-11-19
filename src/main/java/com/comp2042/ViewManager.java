@@ -1,55 +1,48 @@
 package com.comp2042;
 
-import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
-import javafx.scene.image.Image;
-import javafx.scene.layout.AnchorPane;
+import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 
-import java.io.IOException;
-
+/** Uses one window for the start panel and gameplay, preserving the saved record between runs. */
 public class ViewManager {
-
-    private Stage primaryStage = new Stage();
-    private AnchorPane root;
-
-    private Stage gameStage;
-
-    private Image snakeLogo = new Image("resources/views/res/SnakeLogoWhite.png");
-
-    public ViewManager() {
+    private final Stage stage;
+    private GameController controller;
+    /**
+     * Creates a manager for the shared application window.
+     *
+     * @param stage stage used for both menu and gameplay
+     */
+    public ViewManager(Stage stage) { this.stage=stage; }
+    /**
+     * Builds a normal-difficulty session, binds input and styling, and shows the start panel.
+     */
+    public void initializeMainMenu() {
+        GameSession session=new GameSession(new Game(20,20,true,'N'));
+        GameView view=new GameView(session);
+        controller=new GameController(session,view,stage,this::showMainMenu);
+        Scene scene=new Scene(view.root(),640,Math.min(724,javafx.stage.Screen.getPrimary().getVisualBounds().getHeight()-64));
+        scene.getStylesheets().add(Main.class.getResource("/resources/views/garden.css").toExternalForm());
+        scene.addEventFilter(KeyEvent.KEY_PRESSED,controller::handle);
+        stage.setScene(scene);stage.setMinWidth(520);stage.setMinHeight(620);
+        stage.setTitle("Snake");stage.getIcons().setAll(GardenAssets.logo(16),GardenAssets.logo(32),GardenAssets.logo(64));
+        stage.setFullScreenExitHint("");stage.setFullScreenExitKeyCombination(javafx.scene.input.KeyCombination.NO_MATCH);
+        stage.show();view.root().requestFocus();
     }
-
-    public void initalizeMainMenu() {
-        try {
-            FXMLLoader loader = new FXMLLoader();
-            loader.setLocation(Main.class.getResource("/resources/views/MainMenu.fxml"));
-            root = loader.load();
-        } catch (IOException exception) {
-            exception.printStackTrace();
-        }
-
-        Scene mainScene = new Scene(root);
-
-        primaryStage.setScene(mainScene);
-        primaryStage.setResizable(false);
-        primaryStage.getIcons().add(snakeLogo);
-        primaryStage.setTitle("Snake Game");
-        primaryStage.show();
-    }
-
-    public Stage getPrimaryStage() {
-        return primaryStage;
-    }
-
-    public void initGameStage() {
-        gameStage = new Stage();
-        gameStage.setTitle("Snake Game");
-        gameStage.getIcons().add(snakeLogo);
-        gameStage.setResizable(false);
-    }
-
-    public Stage getGameStage() {
-        return gameStage;
-    }
+    /**
+     * Returns the shared application window.
+     *
+     * @return primary stage
+     */
+    public Stage getPrimaryStage() { return stage; }
+    /**
+     * Returns the window used for gameplay.
+     *
+     * @return the same stage as getPrimaryStage()
+     */
+    public Stage getGameStage() { return stage; }
+    /**
+     * Resets the current controller and shows its start screen; requires initialization first.
+     */
+    public void showMainMenu() { controller.showStart(); }
 }

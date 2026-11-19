@@ -5,9 +5,25 @@ import java.util.*;
 
 /** Designs bounded hedge patterns and checks both board connectivity and the current route to food. */
 final class HedgeLayouts {
+    /**
+     * Maps score thresholds to a layout revision.
+     *
+     * @param score current score
+     * @return -1 below 40, 0 below 80, then a new revision every 80 points
+     */
     static int revision(int score) { return score < 40 ? -1 : score < 80 ? 0 : 1 + (score - 80) / 80; }
 
-    /** Tries rotated versions of increasingly structured patterns, never forcing an unsafe layout. */
+    /**
+     * Tries rotated hedge patterns and returns only a safe replacement.
+     *
+     * @param width board width in cells
+     * @param height board height in cells
+     * @param score current score controlling pattern and rotation
+     * @param snake current snake
+     * @param coin pickup cell to preserve
+     * @param current existing collision cells
+     * @return safe proposed cells, or an empty list if no suitable pattern is available
+     */
     static List<Point> propose(int width, int height, int score, Snake snake, Point coin, Collection<Point> current) {
         if (width < 12 || height < 12 || score < 40) return List.of();
         int revision = revision(score);
@@ -50,7 +66,17 @@ final class HedgeLayouts {
         for(int x=x1,y=y1;;x+=dx,y+=dy) { cells.add(new Point(x,y));if(x==x2&&y==y2)break; }
     }
 
-    /** New walls cannot occupy living objects or appear within three steps of the head. */
+    /**
+     * Checks bounds, occupied cells, new-wall distance, connected free space and a route to the pickup.
+     *
+     * @param proposed candidate collision cells
+     * @param current existing collision cells
+     * @param snake snake whose cells and nearby head space must remain clear
+     * @param coin pickup cell, or null to omit the pickup-route check
+     * @param width board width in cells
+     * @param height board height in cells
+     * @return true when every transition safety check passes
+     */
     static boolean safeTransition(Collection<Point> proposed,Collection<Point> current,Snake snake,Point coin,int width,int height) {
         Set<Point> walls=new HashSet<>(proposed),old=new HashSet<>(current);
         Set<Point> occupied=new HashSet<>(snake.getBody());occupied.add(snake.getHead());
