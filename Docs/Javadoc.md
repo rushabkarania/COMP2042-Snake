@@ -40,6 +40,8 @@ uploaded source confirmed unchanged executable code apart from the four equivale
 constructors. The POM parses as XML. These static checks are not a substitute for a
 successful Maven Javadoc run with the project's JDK and JavaFX dependencies.
 
-The patch preparation environment did not have a complete JDK compiler/Javadoc toolchain.
-Run the command above on the Windows development machine to establish the final build
-result. Do not record a zero-warning Javadoc build until that command succeeds.
+Windows validation completed on 18 November 2026 after adding the
+documented SnakeBodyPainter constructor. Generate-Javadoc.ps1 finished
+with BUILD SUCCESS and copied the generated site to Javadoc/index.html.
+No Javadoc warnings were reported. Maven startup dependency warnings
+remained separate from Javadoc generation.
