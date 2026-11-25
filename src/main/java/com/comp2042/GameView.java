@@ -344,14 +344,6 @@ public class GameView {
         return path;
     }
 
-    private void paintSprite(ImageView sprite, int rotation, double x, double y, double cell) {
-        gc.save();
-        gc.translate((x + 0.5) * cell, (y + 0.5) * cell);
-        gc.rotate(rotation);
-        gc.drawImage(sprite.getImage(), -cell / 2, -cell / 2, cell, cell);
-        gc.restore();
-    }
-
     /**
      * Interpolates a one-cell coordinate change, taking the short route across a wrapped boundary.
      *
