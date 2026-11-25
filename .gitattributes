@@ -1,0 +1,4 @@
+mvnw text eol=lf
+*.cmd text eol=crlf
+# Preserve tool-generated HTML and license text; review source whitespace normally.
+Javadoc/** linguist-generated=true -whitespace

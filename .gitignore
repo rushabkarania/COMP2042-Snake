@@ -31,3 +31,10 @@ hs_err_pid*
 # Maven
 /target/
 dependency-reduced-pom.xml
+
+# Original demo is distributed in the coursework submission archive.
+/Demo.mp4
+
+/Design.pdf
+/Design.vpp
+/Demo.mp4
